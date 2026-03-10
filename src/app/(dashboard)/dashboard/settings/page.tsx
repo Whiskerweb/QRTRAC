@@ -1,10 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useTranslations } from 'next-intl'
 import { motion } from 'framer-motion'
-import { fadeInUp } from '@/lib/animations'
-import { Settings, User, Globe, Bell } from 'lucide-react'
+import { fadeInUp, springGentle } from '@/lib/animations'
+import { User, Globe, Bell } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -53,7 +52,13 @@ export default function SettingsPage() {
     }
 
     return (
-        <motion.div {...fadeInUp} className="max-w-2xl space-y-8">
+        <motion.div
+            className="max-w-2xl space-y-8"
+            initial="hidden"
+            animate="visible"
+            variants={fadeInUp}
+            transition={springGentle}
+        >
             {/* Header */}
             <div>
                 <h1 className="text-2xl font-bold text-gray-900">Parametres</h1>

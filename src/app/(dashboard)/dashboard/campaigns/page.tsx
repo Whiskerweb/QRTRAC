@@ -7,8 +7,7 @@ import { motion } from 'framer-motion'
 import { fadeInUp, staggerContainer, staggerItem, springGentle } from '@/lib/animations'
 import {
     Plus, Megaphone, MousePointerClick, Link2,
-    Pencil, Trash2, Archive, Calendar,
-    X, Check
+    Trash2, Archive, X
 } from 'lucide-react'
 import { getMarketingCampaignList, createMarketingCampaign, updateMarketingCampaign, deleteMarketingCampaign } from '@/app/actions/marketing-campaigns'
 import { TAG_COLORS } from '@/lib/marketing/tags'
@@ -40,11 +39,16 @@ export default function CampaignsPage() {
     const [newColor, setNewColor] = useState(TAG_COLORS[4].hex)
 
     const loadCampaigns = useCallback(async () => {
-        const res = await getMarketingCampaignList()
-        if (res.success && res.data) {
-            setCampaigns(res.data as unknown as CampaignData[])
+        try {
+            const res = await getMarketingCampaignList()
+            if (res.success && res.data) {
+                setCampaigns(res.data as unknown as CampaignData[])
+            }
+        } catch (err) {
+            console.error('[campaigns] Failed to load:', err)
+        } finally {
+            setLoading(false)
         }
-        setLoading(false)
     }, [])
 
     useEffect(() => { loadCampaigns() }, [loadCampaigns])
@@ -172,7 +176,7 @@ export default function CampaignsPage() {
                                 disabled={!newName.trim() || creating}
                                 className="btn-press px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 flex items-center gap-2"
                             >
-                                {creating && <span className="w-3.5 h-3.5 rounded-full skeleton-shimmer inline-block" />}
+                                {creating && <span className="w-3.5 h-3.5 rounded-full bg-gray-200 animate-pulse inline-block" />}
                                 {t('campaigns.create')}
                             </button>
                         </div>
@@ -185,11 +189,11 @@ export default function CampaignsPage() {
                 <motion.div variants={fadeInUp} transition={springGentle} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {[...Array(3)].map((_, i) => (
                         <div key={i} className="rounded-xl border border-gray-200 p-5">
-                            <div className="h-5 w-32 rounded mb-2 skeleton-shimmer" />
-                            <div className="h-3 w-48 rounded mb-4 skeleton-shimmer" />
+                            <div className="h-5 w-32 rounded mb-2 bg-gray-200 animate-pulse" />
+                            <div className="h-3 w-48 rounded mb-4 bg-gray-200 animate-pulse" />
                             <div className="flex gap-4">
-                                <div className="h-4 w-16 rounded skeleton-shimmer" />
-                                <div className="h-4 w-16 rounded skeleton-shimmer" />
+                                <div className="h-4 w-16 rounded bg-gray-200 animate-pulse" />
+                                <div className="h-4 w-16 rounded bg-gray-200 animate-pulse" />
                             </div>
                         </div>
                     ))}
