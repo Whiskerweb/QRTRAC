@@ -11,43 +11,42 @@ interface ScannabilityScoreProps {
 export function ScannabilityScore({ state }: ScannabilityScoreProps) {
   const result = useMemo(() => calculateScannability(state), [state]);
 
-  const colorClass =
-    result.level === 'good'
-      ? 'text-green-500'
-      : result.level === 'warning'
-        ? 'text-yellow-500'
-        : 'text-red-500';
-
   const barColor =
     result.level === 'good'
-      ? 'bg-green-500'
+      ? 'bg-emerald-400'
       : result.level === 'warning'
-        ? 'bg-yellow-500'
-        : 'bg-red-500';
+        ? 'bg-amber-400'
+        : 'bg-red-400';
+
+  const textColor =
+    result.level === 'good'
+      ? 'text-emerald-600'
+      : result.level === 'warning'
+        ? 'text-amber-600'
+        : 'text-red-500';
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">Scannabilité</span>
-        <span className={`text-sm font-bold ${colorClass}`}>
+        <span className="text-[13px] font-medium text-gray-600">Scannabilité</span>
+        <span className={`text-[13px] font-bold tabular-nums ${textColor}`}>
           {result.score}%
         </span>
       </div>
-      <div className="h-2 bg-muted rounded-full overflow-hidden">
+      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
         <div
-          className={`h-full rounded-full transition-all duration-300 ${barColor}`}
+          className={`h-full rounded-full transition-all duration-500 ease-out ${barColor}`}
           style={{ width: `${result.score}%` }}
         />
       </div>
       {result.issues.length > 0 && (
-        <ul className="space-y-1">
+        <div className="space-y-0.5">
           {result.issues.map((issue, i) => (
-            <li key={i} className="text-xs text-muted-foreground flex items-start gap-1">
-              <span className="mt-0.5">⚠️</span>
-              <span>{issue}</span>
-            </li>
+            <p key={i} className="text-[11px] text-gray-400 leading-relaxed">
+              {issue}
+            </p>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );

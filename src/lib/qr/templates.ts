@@ -4,7 +4,7 @@ export const QR_TEMPLATES: QRTemplate[] = [
   {
     id: 'minimal',
     name: 'Minimal',
-    preview: '⬛',
+    preview: '#000000',
     config: {
       dotsStyle: {
         type: 'rounded',
@@ -27,7 +27,7 @@ export const QR_TEMPLATES: QRTemplate[] = [
   {
     id: 'corporate',
     name: 'Corporate',
-    preview: '🔷',
+    preview: '#1a2b4a',
     config: {
       dotsStyle: {
         type: 'square',
@@ -49,8 +49,8 @@ export const QR_TEMPLATES: QRTemplate[] = [
   },
   {
     id: 'gradient-pop',
-    name: 'Gradient Pop',
-    preview: '🌈',
+    name: 'Gradient',
+    preview: 'linear-gradient(45deg, #7C3AED, #06B6D4)',
     config: {
       dotsStyle: {
         type: 'dots',
@@ -77,7 +77,7 @@ export const QR_TEMPLATES: QRTemplate[] = [
   {
     id: 'neon',
     name: 'Neon',
-    preview: '💚',
+    preview: '#00FF88',
     config: {
       dotsStyle: {
         type: 'dots',
@@ -100,7 +100,7 @@ export const QR_TEMPLATES: QRTemplate[] = [
   {
     id: 'organic',
     name: 'Organic',
-    preview: '🍂',
+    preview: '#5C4033',
     config: {
       dotsStyle: {
         type: 'extra-rounded',
@@ -123,7 +123,7 @@ export const QR_TEMPLATES: QRTemplate[] = [
   {
     id: 'violet',
     name: 'Violet',
-    preview: '💜',
+    preview: 'linear-gradient(135deg, #7C3AED, #C4B5FD)',
     config: {
       dotsStyle: {
         type: 'classy-rounded',
@@ -150,7 +150,7 @@ export const QR_TEMPLATES: QRTemplate[] = [
   {
     id: 'retro',
     name: 'Retro',
-    preview: '🟠',
+    preview: '#B5451B',
     config: {
       dotsStyle: {
         type: 'classy',

@@ -8,7 +8,6 @@ import { createClient } from '@/lib/supabase/client';
 import { QRPreview } from './QRPreview';
 import { DataPanel } from './DataPanel';
 import { StylePanel } from './StylePanel';
-import { LogoPanel } from './LogoPanel';
 import { ExportPanel } from './ExportPanel';
 import { TemplateGallery } from './TemplateGallery';
 import { ScannabilityScore } from './ScannabilityScore';
@@ -162,15 +161,13 @@ export function QREditor({ qrId }: QREditorProps) {
         <div className="w-80 border-r border-border flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto p-4">
             <Tabs defaultValue="content">
-              <TabsList className="w-full grid grid-cols-4">
-                <TabsTrigger value="content" className="text-xs px-2">📝</TabsTrigger>
-                <TabsTrigger value="style" className="text-xs px-2">🎨</TabsTrigger>
-                <TabsTrigger value="logo" className="text-xs px-2">🖼️</TabsTrigger>
-                <TabsTrigger value="export" className="text-xs px-2">📤</TabsTrigger>
+              <TabsList className="w-full grid grid-cols-3">
+                <TabsTrigger value="content" className="text-xs px-2">Contenu</TabsTrigger>
+                <TabsTrigger value="style" className="text-xs px-2">Style</TabsTrigger>
+                <TabsTrigger value="export" className="text-xs px-2">Export</TabsTrigger>
               </TabsList>
 
               <TabsContent value="content" className="mt-4">
-                <h3 className="text-sm font-semibold mb-3">Contenu</h3>
                 <DataPanel
                   state={state}
                   onContentTypeChange={setContentType}
@@ -179,17 +176,10 @@ export function QREditor({ qrId }: QREditorProps) {
               </TabsContent>
 
               <TabsContent value="style" className="mt-4">
-                <h3 className="text-sm font-semibold mb-3">Style</h3>
                 <StylePanel state={state} onUpdate={update} />
               </TabsContent>
 
-              <TabsContent value="logo" className="mt-4">
-                <h3 className="text-sm font-semibold mb-3">Logo</h3>
-                <LogoPanel state={state} onUpdate={update} />
-              </TabsContent>
-
               <TabsContent value="export" className="mt-4">
-                <h3 className="text-sm font-semibold mb-3">Export</h3>
                 <ExportPanel state={state} onUpdate={update} qrInstance={qrInstance} />
               </TabsContent>
             </Tabs>
