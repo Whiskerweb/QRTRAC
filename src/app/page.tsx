@@ -18,11 +18,21 @@ export default async function HomePage() {
   let displayName = '';
   let initials = '';
   if (user) {
-    const { data: profile } = await supabase
+    let { data: profile } = await supabase
       .from('profiles')
       .select('display_name')
       .eq('id', user.id)
       .single();
+    // Auto-create profile for existing auth users (e.g. from main Traaaction app)
+    if (!profile) {
+      const fallbackName = user.user_metadata?.display_name || user.email?.split('@')[0] || 'Utilisateur';
+      const { data: created } = await supabase
+        .from('profiles')
+        .upsert({ id: user.id, display_name: fallbackName }, { onConflict: 'id' })
+        .select('display_name')
+        .single();
+      profile = created;
+    }
     displayName = profile?.display_name || user.email?.split('@')[0] || 'Utilisateur';
     initials = displayName.slice(0, 2).toUpperCase();
   }

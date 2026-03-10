@@ -14,11 +14,22 @@ export default async function DashboardLayout({
         redirect('/login')
     }
 
-    const { data: profile } = await supabase
+    let { data: profile } = await supabase
         .from('profiles')
         .select('display_name, avatar_url, plan')
         .eq('id', user.id)
         .single()
+
+    // Auto-create profile for existing auth users (e.g. users from the main Traaaction app)
+    if (!profile) {
+        const fallbackName = user.user_metadata?.display_name || user.email?.split('@')[0] || 'User'
+        const { data: created } = await supabase
+            .from('profiles')
+            .upsert({ id: user.id, display_name: fallbackName }, { onConflict: 'id' })
+            .select('display_name, avatar_url, plan')
+            .single()
+        profile = created
+    }
 
     const displayName = profile?.display_name || user.email?.split('@')[0] || 'User'
     const email = user.email || ''

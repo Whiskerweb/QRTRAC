@@ -23,13 +23,21 @@ export function useAuth() {
   const supabase = createClient();
 
   const fetchProfile = useCallback(
-    async (userId: string) => {
+    async (userId: string, email?: string) => {
       const { data } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
-      return data as UserProfile | null;
+      if (data) return data as UserProfile;
+      // Auto-create profile for existing auth users
+      const fallbackName = email?.split('@')[0] || 'User';
+      const { data: created } = await supabase
+        .from('profiles')
+        .upsert({ id: userId, display_name: fallbackName }, { onConflict: 'id' })
+        .select('*')
+        .single();
+      return created as UserProfile | null;
     },
     [supabase]
   );
@@ -37,7 +45,7 @@ export function useAuth() {
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       const profile = session?.user
-        ? await fetchProfile(session.user.id)
+        ? await fetchProfile(session.user.id, session.user.email ?? undefined)
         : null;
       setState({
         user: session?.user ?? null,
@@ -51,7 +59,7 @@ export function useAuth() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const profile = session?.user
-        ? await fetchProfile(session.user.id)
+        ? await fetchProfile(session.user.id, session.user.email ?? undefined)
         : null;
       setState({
         user: session?.user ?? null,
