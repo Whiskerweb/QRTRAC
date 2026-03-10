@@ -28,8 +28,8 @@ export function DashboardContent({ initialQrCount, initialScanTotal, initialFavC
             label: 'QR codes',
             value: qrCount,
             icon: QrCode,
-            bgColor: 'bg-purple-50',
-            iconColor: 'text-purple-600',
+            bgColor: 'bg-gray-100',
+            iconColor: 'text-gray-700',
         },
         {
             label: 'Total scans',

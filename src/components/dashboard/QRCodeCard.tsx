@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Card } from '@/components/ui/card';
@@ -23,6 +22,7 @@ interface QRCodeCardProps {
   onDuplicate: (qr: QRCodeRecord) => void;
   onToggleFavorite: (id: string, value: boolean) => void;
   onMoveToFolder?: (qrId: string) => void;
+  onEdit?: (id: string) => void;
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
   selectionMode?: boolean;
@@ -45,6 +45,7 @@ export function QRCodeCard({
   onDuplicate,
   onToggleFavorite,
   onMoveToFolder,
+  onEdit,
   selected = false,
   onToggleSelect,
   selectionMode = false,
@@ -61,7 +62,7 @@ export function QRCodeCard({
     <Card
       className={`group overflow-hidden transition-all duration-150 ${
         selected
-          ? 'ring-2 ring-purple-500 shadow-md'
+          ? 'ring-2 ring-gray-900 shadow-md'
           : 'hover:shadow-md'
       }`}
     >
@@ -80,7 +81,7 @@ export function QRCodeCard({
         )}
 
         {/* Hover overlay */}
-        <div className="absolute inset-0 bg-purple-900/0 group-hover:bg-purple-900/[0.03] transition-colors" />
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/[0.03] transition-colors" />
 
         {/* Checkbox - visible on hover or selection mode */}
         {onToggleSelect && (
@@ -88,7 +89,7 @@ export function QRCodeCard({
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleSelect(qr.id); }}
             className={`absolute top-2 left-2 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
               selected
-                ? 'bg-purple-600 border-purple-600'
+                ? 'bg-gray-900 border-gray-900'
                 : selectionMode
                   ? 'border-gray-300 bg-white/80'
                   : 'border-gray-300 bg-white/80 opacity-0 group-hover:opacity-100'
@@ -150,11 +151,9 @@ export function QRCodeCard({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem asChild>
-                <Link href={`/dashboard/editor/${qr.id}`} className="flex items-center">
-                  <Edit className="mr-2 h-4 w-4" />
-                  Éditer
-                </Link>
+              <DropdownMenuItem onClick={() => onEdit?.(qr.id)}>
+                <Edit className="mr-2 h-4 w-4" />
+                Éditer
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onDuplicate(qr)}>
                 <Copy className="mr-2 h-4 w-4" />

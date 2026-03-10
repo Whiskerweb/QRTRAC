@@ -27,14 +27,9 @@ interface NavSection {
 
 const navigationConfig: NavSection[] = [
     {
-        titleKey: '',
-        items: [
-            { nameKey: 'qrCodes', href: '/dashboard', icon: QrCode },
-        ]
-    },
-    {
         titleKey: 'marketing',
         items: [
+            { nameKey: 'qrCodes', href: '/dashboard', icon: QrCode },
             { nameKey: 'links', href: '/dashboard/links', icon: Link2 },
             { nameKey: 'campaigns', href: '/dashboard/campaigns', icon: Megaphone },
             { nameKey: 'analytics', href: '/dashboard/analytics', icon: BarChart3 },
@@ -76,7 +71,7 @@ export function SidebarNav({ displayName, email }: SidebarNavProps) {
             {/* Logo + Brand */}
             <div className={`h-16 flex items-center border-b border-gray-100 ${collapsed ? 'px-2 justify-center' : 'px-4'}`}>
                 <Link href="/dashboard" className={`flex items-center gap-2.5 p-2 rounded-xl hover:bg-gray-50 transition-colors ${collapsed ? 'justify-center' : 'w-full'}`}>
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-600 to-purple-500 flex items-center justify-center flex-shrink-0 shadow-sm">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-gray-900 to-gray-700 flex items-center justify-center flex-shrink-0 shadow-sm">
                         <span className="text-white font-bold text-[11px] tracking-tight">QR</span>
                     </div>
                     {!collapsed && (
@@ -115,11 +110,11 @@ export function SidebarNav({ displayName, email }: SidebarNavProps) {
                                                 whileTap={{ scale: 0.97 }}
                                                 transition={springSnappy}
                                                 className={`flex items-center gap-3 rounded-xl transition-all duration-150 text-[13px] relative group ${collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2'} ${isActive
-                                                    ? 'bg-purple-50 text-purple-700 font-medium'
+                                                    ? 'bg-gray-100 text-gray-900 font-medium'
                                                     : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
                                                     }`}
                                             >
-                                                <Icon className={`w-[18px] h-[18px] flex-shrink-0 ${isActive ? 'text-purple-600' : 'text-gray-400 group-hover:text-gray-600'}`} strokeWidth={1.8} />
+                                                <Icon className={`w-[18px] h-[18px] flex-shrink-0 ${isActive ? 'text-gray-700' : 'text-gray-400 group-hover:text-gray-600'}`} strokeWidth={1.8} />
                                                 {!collapsed && <span>{t(item.nameKey)}</span>}
                                             </MotionLink>
                                         </li>
@@ -142,11 +137,11 @@ export function SidebarNav({ displayName, email }: SidebarNavProps) {
                         whileTap={{ scale: 0.97 }}
                         transition={springSnappy}
                         className={`flex items-center gap-3 rounded-xl transition-all duration-150 text-[13px] group ${collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2'} ${pathname === '/dashboard/settings'
-                            ? 'bg-purple-50 text-purple-700 font-medium'
+                            ? 'bg-gray-100 text-gray-900 font-medium'
                             : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
                             }`}
                     >
-                        <Settings className={`w-[18px] h-[18px] flex-shrink-0 ${pathname === '/dashboard/settings' ? 'text-purple-600' : 'text-gray-400 group-hover:text-gray-600'}`} strokeWidth={1.8} />
+                        <Settings className={`w-[18px] h-[18px] flex-shrink-0 ${pathname === '/dashboard/settings' ? 'text-gray-700' : 'text-gray-400 group-hover:text-gray-600'}`} strokeWidth={1.8} />
                         {!collapsed && <span>{t('settings')}</span>}
                     </MotionLink>
                 </div>
@@ -182,7 +177,7 @@ export function SidebarNav({ displayName, email }: SidebarNavProps) {
             {/* Profile */}
             <div className={`p-3 border-t border-gray-100 ${collapsed ? 'flex justify-center' : ''}`}>
                 <div className={`flex items-center gap-3 rounded-xl ${collapsed ? 'p-2 justify-center' : 'px-3 py-2'}`}>
-                    <div className={`rounded-full bg-gradient-to-br from-purple-600 to-purple-500 flex items-center justify-center ${collapsed ? 'w-9 h-9' : 'w-8 h-8'} text-white text-xs font-semibold shadow-sm`}>
+                    <div className={`rounded-full bg-gradient-to-br from-gray-900 to-gray-700 flex items-center justify-center ${collapsed ? 'w-9 h-9' : 'w-8 h-8'} text-white text-xs font-semibold shadow-sm`}>
                         {initials}
                     </div>
                     {!collapsed && (
@@ -215,7 +210,7 @@ export function SidebarNav({ displayName, email }: SidebarNavProps) {
                     <Menu className="w-5 h-5 text-gray-700" />
                 </button>
                 <Link href="/dashboard" className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-600 to-purple-500 flex items-center justify-center">
+                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-gray-900 to-gray-700 flex items-center justify-center">
                         <span className="text-white font-bold text-[10px]">QR</span>
                     </div>
                     <span className="text-sm font-semibold text-gray-900">QR<span className="text-gray-400">.traaaction</span></span>

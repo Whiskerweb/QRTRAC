@@ -140,7 +140,7 @@ export function QRFolderSidebar({ activeFolderId, onSelectFolder, totalQrCount }
                     <div
                         className={`group flex items-center gap-1.5 px-2 py-1.5 mx-1 rounded-lg cursor-pointer text-[13px] transition-colors ${
                             isActive
-                                ? 'bg-purple-50 text-purple-700 font-medium'
+                                ? 'bg-gray-100 text-gray-900 font-medium'
                                 : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                         }`}
                         style={{ paddingLeft: `${8 + depth * 16}px` }}
@@ -157,12 +157,12 @@ export function QRFolderSidebar({ activeFolderId, onSelectFolder, totalQrCount }
                             <span className="w-4" />
                         )}
                         <Folder
-                            className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-purple-500' : 'text-gray-400'}`}
+                            className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-gray-700' : 'text-gray-400'}`}
                             style={{ color: isActive ? undefined : folder.color }}
                             fill={isActive ? 'currentColor' : 'none'}
                         />
                         <span className="flex-1 truncate">{folder.name}</span>
-                        <span className={`text-[11px] tabular-nums ${isActive ? 'text-purple-400' : 'text-gray-400'}`}>
+                        <span className={`text-[11px] tabular-nums ${isActive ? 'text-gray-500' : 'text-gray-400'}`}>
                             {folder.qrCount}
                         </span>
                         <DropdownMenu>
@@ -250,13 +250,13 @@ export function QRFolderSidebar({ activeFolderId, onSelectFolder, totalQrCount }
                     onClick={() => onSelectFolder(null)}
                     className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[13px] transition-colors ${
                         activeFolderId === null
-                            ? 'bg-purple-50 text-purple-700 font-medium'
+                            ? 'bg-gray-100 text-gray-900 font-medium'
                             : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }`}
                 >
-                    <QrCode className={`w-4 h-4 ${activeFolderId === null ? 'text-purple-500' : 'text-gray-400'}`} />
+                    <QrCode className={`w-4 h-4 ${activeFolderId === null ? 'text-gray-700' : 'text-gray-400'}`} />
                     <span className="flex-1 text-left">Tous les QR</span>
-                    <span className={`text-[11px] tabular-nums ${activeFolderId === null ? 'text-purple-400' : 'text-gray-400'}`}>
+                    <span className={`text-[11px] tabular-nums ${activeFolderId === null ? 'text-gray-500' : 'text-gray-400'}`}>
                         {totalQrCount}
                     </span>
                 </button>
@@ -266,11 +266,11 @@ export function QRFolderSidebar({ activeFolderId, onSelectFolder, totalQrCount }
                     onClick={() => onSelectFolder('uncategorized')}
                     className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[13px] transition-colors ${
                         activeFolderId === 'uncategorized'
-                            ? 'bg-purple-50 text-purple-700 font-medium'
+                            ? 'bg-gray-100 text-gray-900 font-medium'
                             : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }`}
                 >
-                    <FolderOpen className={`w-4 h-4 ${activeFolderId === 'uncategorized' ? 'text-purple-500' : 'text-gray-400'}`} />
+                    <FolderOpen className={`w-4 h-4 ${activeFolderId === 'uncategorized' ? 'text-gray-700' : 'text-gray-400'}`} />
                     <span className="flex-1 text-left">Non classés</span>
                 </button>
             </div>

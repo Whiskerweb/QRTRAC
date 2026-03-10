@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { QRCodeCard } from './QRCodeCard';
 import { QRBulkActionBar } from './QRBulkActionBar';
+import { CreateQRModal } from './CreateQRModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Search, Star } from 'lucide-react';
@@ -23,6 +23,8 @@ export function QRCodeGrid({ activeFolderId, onMoveToFolder, onQrCountChange }: 
   const [search, setSearch] = useState('');
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingQrId, setEditingQrId] = useState<string | undefined>(undefined);
   const supabase = createClient();
 
   const fetchQRCodes = useCallback(async () => {
@@ -36,7 +38,6 @@ export function QRCodeGrid({ activeFolderId, onMoveToFolder, onQrCountChange }: 
     } else {
       const codes = (data as QRCodeRecord[]) || [];
       setQrCodes(codes);
-      // Report stats up
       if (onQrCountChange) {
         const total = codes.length;
         const scanTotal = codes.reduce((sum, q) => sum + (q.scan_count || 0), 0);
@@ -51,7 +52,6 @@ export function QRCodeGrid({ activeFolderId, onMoveToFolder, onQrCountChange }: 
     fetchQRCodes();
   }, [fetchQRCodes]);
 
-  // Clear selection when folder changes
   useEffect(() => {
     setSelectedIds(new Set());
   }, [activeFolderId]);
@@ -123,14 +123,22 @@ export function QRCodeGrid({ activeFolderId, onMoveToFolder, onQrCountChange }: 
     }
   };
 
-  // Filter by folder
+  const handleEdit = (id: string) => {
+    setEditingQrId(id);
+    setShowCreateModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowCreateModal(false);
+    setEditingQrId(undefined);
+  };
+
   const folderFiltered = qrCodes.filter(q => {
-    if (activeFolderId === null) return true; // All
+    if (activeFolderId === null) return true;
     if (activeFolderId === 'uncategorized') return !q.folder_id;
     return q.folder_id === activeFolderId;
   });
 
-  // Then by search + favorites
   const filtered = folderFiltered.filter((q) => {
     if (favoritesOnly && !q.is_favorite) return false;
     if (search && !q.name.toLowerCase().includes(search.toLowerCase())) return false;
@@ -164,17 +172,19 @@ export function QRCodeGrid({ activeFolderId, onMoveToFolder, onQrCountChange }: 
           variant={favoritesOnly ? 'default' : 'outline'}
           size="sm"
           onClick={() => setFavoritesOnly(!favoritesOnly)}
-          className={favoritesOnly ? 'bg-purple-600 hover:bg-purple-700' : ''}
+          className={favoritesOnly ? 'bg-gray-900 hover:bg-gray-800' : ''}
         >
           <Star className={`mr-2 h-4 w-4 ${favoritesOnly ? 'fill-current' : ''}`} />
           Favoris
         </Button>
-        <Link href="/dashboard/editor">
-          <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-white">
-            <Plus className="mr-2 h-4 w-4" />
-            Nouveau QR
-          </Button>
-        </Link>
+        <Button
+          size="sm"
+          className="bg-gray-900 hover:bg-gray-800 text-white"
+          onClick={() => { setEditingQrId(undefined); setShowCreateModal(true); }}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Nouveau QR
+        </Button>
       </div>
 
       {/* Grid */}
@@ -182,8 +192,8 @@ export function QRCodeGrid({ activeFolderId, onMoveToFolder, onQrCountChange }: 
         <div className="text-center py-16 space-y-3">
           {qrCodes.length === 0 ? (
             <>
-              <div className="w-16 h-16 rounded-2xl bg-purple-50 flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl text-purple-400">▪</span>
+              <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl text-gray-400">▪</span>
               </div>
               <p className="text-gray-600 font-medium">
                 Aucun QR code pour l&apos;instant
@@ -191,12 +201,13 @@ export function QRCodeGrid({ activeFolderId, onMoveToFolder, onQrCountChange }: 
               <p className="text-sm text-gray-400">
                 Créez votre premier QR code design
               </p>
-              <Link href="/dashboard/editor">
-                <Button className="bg-purple-600 hover:bg-purple-700 text-white mt-2">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Créer un QR code
-                </Button>
-              </Link>
+              <Button
+                className="bg-gray-900 hover:bg-gray-800 text-white mt-2"
+                onClick={() => { setEditingQrId(undefined); setShowCreateModal(true); }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Créer un QR code
+              </Button>
             </>
           ) : (
             <p className="text-gray-400">Aucun résultat pour cette recherche</p>
@@ -212,6 +223,7 @@ export function QRCodeGrid({ activeFolderId, onMoveToFolder, onQrCountChange }: 
               onDuplicate={handleDuplicate}
               onToggleFavorite={handleToggleFavorite}
               onMoveToFolder={onMoveToFolder}
+              onEdit={handleEdit}
               selected={selectedIds.has(qr.id)}
               onToggleSelect={handleToggleSelect}
               selectionMode={selectedIds.size > 0}
@@ -227,12 +239,19 @@ export function QRCodeGrid({ activeFolderId, onMoveToFolder, onQrCountChange }: 
           onClearSelection={() => setSelectedIds(new Set())}
           onDelete={handleBulkDelete}
           onMoveToFolder={onMoveToFolder ? () => {
-            // Move all selected to folder - trigger folder picker
             const ids = Array.from(selectedIds);
             if (ids.length > 0) onMoveToFolder(ids[0]);
           } : undefined}
         />
       )}
+
+      {/* QR Editor Modal */}
+      <CreateQRModal
+        isOpen={showCreateModal}
+        onClose={handleCloseModal}
+        onSuccess={fetchQRCodes}
+        qrId={editingQrId}
+      />
     </div>
   );
 }
