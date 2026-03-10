@@ -29,7 +29,11 @@ export async function createMarketingCampaign(input: CreateCampaignInput) {
         workspace_id: workspace.workspaceId,
     }).select().single()
 
-    if (error) return { success: false, error: 'Campaign name already exists' }
+    if (error) {
+        if (error.code === '23505') return { success: false, error: 'Ce nom de campagne existe déjà' }
+        console.error('[campaigns] create error:', error.message, error.code, error.details)
+        return { success: false, error: error.message || 'Erreur lors de la création' }
+    }
 
     return { success: true, data: campaign }
 }
@@ -60,7 +64,11 @@ export async function updateMarketingCampaign(id: string, input: UpdateCampaignI
     if (input.end_date !== undefined) data.end_date = input.end_date ? new Date(input.end_date).toISOString() : null
 
     const { data: updated, error } = await supabase.from('MarketingCampaign').update(data).eq('id', id).select().single()
-    if (error) return { success: false, error: 'Campaign name already exists' }
+    if (error) {
+        if (error.code === '23505') return { success: false, error: 'Ce nom de campagne existe déjà' }
+        console.error('[campaigns] update error:', error.message, error.code, error.details)
+        return { success: false, error: error.message || 'Erreur lors de la mise à jour' }
+    }
 
     // Cascade name change to links
     if (input.name !== undefined && input.name.trim() !== campaign.name) {
@@ -91,20 +99,23 @@ export async function getMarketingCampaignList() {
     if (!workspace) return { success: false, error: 'Not authenticated', data: [] }
 
     const supabase = await createClient()
-    const { data: campaigns } = await supabase
+    const { data: campaigns, error: listError } = await supabase
         .from('MarketingCampaign')
         .select('*')
         .eq('workspace_id', workspace.workspaceId)
         .order('created_at', { ascending: false })
 
-    if (!campaigns) return { success: false, error: 'Failed', data: [] }
+    if (listError) {
+        console.error('[campaigns] list error:', listError.message, listError.code)
+        return { success: false, error: listError.message, data: [] }
+    }
+    if (!campaigns) return { success: true, data: [] }
 
     // Get link counts and clicks per campaign
     const campaignIds = campaigns.map(c => c.id)
-    const { data: links } = await supabase
-        .from('ShortLink')
-        .select('campaign_id, clicks')
-        .in('campaign_id', campaignIds)
+    const { data: links } = campaignIds.length > 0
+        ? await supabase.from('ShortLink').select('campaign_id, clicks').in('campaign_id', campaignIds)
+        : { data: [] as { campaign_id: string; clicks: number }[] }
 
     const statsMap = new Map<string, { linkCount: number; totalClicks: number }>()
     for (const link of (links || [])) {
