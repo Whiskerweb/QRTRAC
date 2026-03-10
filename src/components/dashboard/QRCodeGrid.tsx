@@ -4,17 +4,25 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { QRCodeCard } from './QRCodeCard';
+import { QRBulkActionBar } from './QRBulkActionBar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Search, Star } from 'lucide-react';
 import type { QRCodeRecord } from '@/types/qr';
 import { toast } from 'sonner';
 
-export function QRCodeGrid() {
+interface QRCodeGridProps {
+  activeFolderId: string | null;
+  onMoveToFolder?: (qrId: string) => void;
+  onQrCountChange?: (total: number, scanTotal: number, favCount: number) => void;
+}
+
+export function QRCodeGrid({ activeFolderId, onMoveToFolder, onQrCountChange }: QRCodeGridProps) {
   const [qrCodes, setQrCodes] = useState<QRCodeRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const supabase = createClient();
 
   const fetchQRCodes = useCallback(async () => {
@@ -26,14 +34,27 @@ export function QRCodeGrid() {
     if (error) {
       toast.error('Erreur lors du chargement');
     } else {
-      setQrCodes((data as QRCodeRecord[]) || []);
+      const codes = (data as QRCodeRecord[]) || [];
+      setQrCodes(codes);
+      // Report stats up
+      if (onQrCountChange) {
+        const total = codes.length;
+        const scanTotal = codes.reduce((sum, q) => sum + (q.scan_count || 0), 0);
+        const favCount = codes.filter(q => q.is_favorite).length;
+        onQrCountChange(total, scanTotal, favCount);
+      }
     }
     setLoading(false);
-  }, [supabase]);
+  }, [supabase, onQrCountChange]);
 
   useEffect(() => {
     fetchQRCodes();
   }, [fetchQRCodes]);
+
+  // Clear selection when folder changes
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [activeFolderId]);
 
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from('qr_codes').delete().eq('id', id);
@@ -41,6 +62,7 @@ export function QRCodeGrid() {
       toast.error('Erreur lors de la suppression');
     } else {
       setQrCodes((prev) => prev.filter((q) => q.id !== id));
+      setSelectedIds(prev => { const next = new Set(prev); next.delete(id); return next; });
       toast.success('QR code supprimé');
     }
   };
@@ -56,6 +78,7 @@ export function QRCodeGrid() {
       content_data: qr.content_data,
       style_config: qr.style_config,
       logo_path: qr.logo_path,
+      folder_id: qr.folder_id,
     });
 
     if (error) {
@@ -79,7 +102,36 @@ export function QRCodeGrid() {
     }
   };
 
-  const filtered = qrCodes.filter((q) => {
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`Supprimer ${selectedIds.size} QR code(s) ?`)) return;
+    const ids = Array.from(selectedIds);
+    const { error } = await supabase.from('qr_codes').delete().in('id', ids);
+    if (error) {
+      toast.error('Erreur lors de la suppression');
+    } else {
+      setQrCodes(prev => prev.filter(q => !selectedIds.has(q.id)));
+      setSelectedIds(new Set());
+      toast.success(`${ids.length} QR code(s) supprimé(s)`);
+    }
+  };
+
+  // Filter by folder
+  const folderFiltered = qrCodes.filter(q => {
+    if (activeFolderId === null) return true; // All
+    if (activeFolderId === 'uncategorized') return !q.folder_id;
+    return q.folder_id === activeFolderId;
+  });
+
+  // Then by search + favorites
+  const filtered = folderFiltered.filter((q) => {
     if (favoritesOnly && !q.is_favorite) return false;
     if (search && !q.name.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
@@ -87,37 +139,38 @@ export function QRCodeGrid() {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
         {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="h-52 rounded-lg bg-muted animate-pulse" />
+          <div key={i} className="h-52 rounded-xl bg-gray-100 animate-pulse" />
         ))}
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 relative">
       {/* Toolbar */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder="Rechercher..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            className="pl-9 h-9 bg-gray-50 border-gray-200"
           />
         </div>
         <Button
           variant={favoritesOnly ? 'default' : 'outline'}
           size="sm"
           onClick={() => setFavoritesOnly(!favoritesOnly)}
+          className={favoritesOnly ? 'bg-purple-600 hover:bg-purple-700' : ''}
         >
           <Star className={`mr-2 h-4 w-4 ${favoritesOnly ? 'fill-current' : ''}`} />
           Favoris
         </Button>
         <Link href="/dashboard/editor">
-          <Button size="sm">
+          <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-white">
             <Plus className="mr-2 h-4 w-4" />
             Nouveau QR
           </Button>
@@ -129,26 +182,28 @@ export function QRCodeGrid() {
         <div className="text-center py-16 space-y-3">
           {qrCodes.length === 0 ? (
             <>
-              <div className="text-5xl">▪</div>
-              <p className="text-muted-foreground font-medium">
+              <div className="w-16 h-16 rounded-2xl bg-purple-50 flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl text-purple-400">▪</span>
+              </div>
+              <p className="text-gray-600 font-medium">
                 Aucun QR code pour l&apos;instant
               </p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-gray-400">
                 Créez votre premier QR code design
               </p>
               <Link href="/dashboard/editor">
-                <Button>
+                <Button className="bg-purple-600 hover:bg-purple-700 text-white mt-2">
                   <Plus className="mr-2 h-4 w-4" />
                   Créer un QR code
                 </Button>
               </Link>
             </>
           ) : (
-            <p className="text-muted-foreground">Aucun résultat pour cette recherche</p>
+            <p className="text-gray-400">Aucun résultat pour cette recherche</p>
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {filtered.map((qr) => (
             <QRCodeCard
               key={qr.id}
@@ -156,9 +211,27 @@ export function QRCodeGrid() {
               onDelete={handleDelete}
               onDuplicate={handleDuplicate}
               onToggleFavorite={handleToggleFavorite}
+              onMoveToFolder={onMoveToFolder}
+              selected={selectedIds.has(qr.id)}
+              onToggleSelect={handleToggleSelect}
+              selectionMode={selectedIds.size > 0}
             />
           ))}
         </div>
+      )}
+
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <QRBulkActionBar
+          count={selectedIds.size}
+          onClearSelection={() => setSelectedIds(new Set())}
+          onDelete={handleBulkDelete}
+          onMoveToFolder={onMoveToFolder ? () => {
+            // Move all selected to folder - trigger folder picker
+            const ids = Array.from(selectedIds);
+            if (ids.length > 0) onMoveToFolder(ids[0]);
+          } : undefined}
+        />
       )}
     </div>
   );

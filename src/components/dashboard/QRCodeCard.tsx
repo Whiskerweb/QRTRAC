@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Edit, Copy, Download, Trash2, Star } from 'lucide-react';
+import { MoreHorizontal, Edit, Copy, Trash2, Star, ScanLine, FolderInput } from 'lucide-react';
 import type { QRCodeRecord } from '@/types/qr';
 
 interface QRCodeCardProps {
@@ -22,6 +22,10 @@ interface QRCodeCardProps {
   onDelete: (id: string) => void;
   onDuplicate: (qr: QRCodeRecord) => void;
   onToggleFavorite: (id: string, value: boolean) => void;
+  onMoveToFolder?: (qrId: string) => void;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
+  selectionMode?: boolean;
 }
 
 const CONTENT_TYPE_LABELS: Record<string, string> = {
@@ -35,7 +39,16 @@ const CONTENT_TYPE_LABELS: Record<string, string> = {
   geo: 'Lieu',
 };
 
-export function QRCodeCard({ qr, onDelete, onDuplicate, onToggleFavorite }: QRCodeCardProps) {
+export function QRCodeCard({
+  qr,
+  onDelete,
+  onDuplicate,
+  onToggleFavorite,
+  onMoveToFolder,
+  selected = false,
+  onToggleSelect,
+  selectionMode = false,
+}: QRCodeCardProps) {
   const [loading, setLoading] = useState(false);
 
   const handleDelete = async () => {
@@ -45,9 +58,15 @@ export function QRCodeCard({ qr, onDelete, onDuplicate, onToggleFavorite }: QRCo
   };
 
   return (
-    <Card className="group overflow-hidden hover:shadow-md transition-shadow">
+    <Card
+      className={`group overflow-hidden transition-all duration-150 ${
+        selected
+          ? 'ring-2 ring-purple-500 shadow-md'
+          : 'hover:shadow-md'
+      }`}
+    >
       {/* Thumbnail */}
-      <div className="relative bg-muted/30 flex items-center justify-center h-40 border-b border-border">
+      <div className="relative bg-gray-50 flex items-center justify-center h-40 border-b border-gray-100">
         {qr.thumbnail_url ? (
           <img
             src={qr.thumbnail_url}
@@ -55,70 +74,109 @@ export function QRCodeCard({ qr, onDelete, onDuplicate, onToggleFavorite }: QRCo
             className="w-32 h-32 object-contain"
           />
         ) : (
-          <div className="w-32 h-32 bg-muted rounded-lg flex items-center justify-center">
-            <span className="text-4xl">▪</span>
+          <div className="w-32 h-32 bg-gray-100 rounded-lg flex items-center justify-center">
+            <span className="text-4xl text-gray-300">▪</span>
           </div>
         )}
 
-        {/* Actions overlay */}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors" />
+        {/* Hover overlay */}
+        <div className="absolute inset-0 bg-purple-900/0 group-hover:bg-purple-900/[0.03] transition-colors" />
+
+        {/* Checkbox - visible on hover or selection mode */}
+        {onToggleSelect && (
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleSelect(qr.id); }}
+            className={`absolute top-2 left-2 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+              selected
+                ? 'bg-purple-600 border-purple-600'
+                : selectionMode
+                  ? 'border-gray-300 bg-white/80'
+                  : 'border-gray-300 bg-white/80 opacity-0 group-hover:opacity-100'
+            }`}
+          >
+            {selected && (
+              <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
+                <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </button>
+        )}
+
+        {/* Content type badge */}
+        <Badge
+          variant="secondary"
+          className="absolute top-2 right-2 text-[10px] px-1.5 py-0 bg-white/90 text-gray-600 border-0 shadow-sm"
+        >
+          {CONTENT_TYPE_LABELS[qr.content_type] || qr.content_type}
+        </Badge>
+
+        {/* Scan count badge */}
+        <div className="absolute bottom-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white/90 shadow-sm">
+          <ScanLine className="w-3 h-3 text-gray-500" />
+          <span className="text-[11px] font-medium text-gray-600 tabular-nums">
+            {qr.scan_count || 0}
+          </span>
+        </div>
 
         {/* Favorite button */}
         <button
           onClick={() => onToggleFavorite(qr.id, !qr.is_favorite)}
-          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-full bg-background/80 hover:bg-background"
+          className={`absolute bottom-2 right-2 p-1 rounded-full bg-white/90 shadow-sm transition-opacity ${
+            qr.is_favorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          }`}
         >
           <Star
-            className={`h-4 w-4 ${qr.is_favorite ? 'text-yellow-500 fill-yellow-500' : 'text-muted-foreground'}`}
+            className={`h-3.5 w-3.5 ${qr.is_favorite ? 'text-amber-500 fill-amber-500' : 'text-gray-400'}`}
           />
         </button>
       </div>
 
       {/* Info */}
-      <div className="p-3 space-y-2">
-        <div className="flex items-start justify-between gap-2">
+      <div className="p-3 space-y-1">
+        <div className="flex items-start justify-between gap-1">
           <div className="min-w-0 flex-1">
-            <h3 className="font-medium text-sm truncate">{qr.name}</h3>
-            <p className="text-xs text-muted-foreground">
+            <h3 className="font-medium text-sm truncate text-gray-900">{qr.name}</h3>
+            <p className="text-[11px] text-gray-400">
               {formatDistanceToNow(new Date(qr.created_at), {
                 addSuffix: true,
                 locale: fr,
               })}
             </p>
           </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <Badge variant="secondary" className="text-xs">
-              {CONTENT_TYPE_LABELS[qr.content_type] || qr.content_type}
-            </Badge>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem asChild>
-                  <Link href={`/dashboard/editor/${qr.id}`} className="flex items-center">
-                    <Edit className="mr-2 h-4 w-4" />
-                    Éditer
-                  </Link>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                <MoreHorizontal className="h-4 w-4 text-gray-400" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem asChild>
+                <Link href={`/dashboard/editor/${qr.id}`} className="flex items-center">
+                  <Edit className="mr-2 h-4 w-4" />
+                  Éditer
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDuplicate(qr)}>
+                <Copy className="mr-2 h-4 w-4" />
+                Dupliquer
+              </DropdownMenuItem>
+              {onMoveToFolder && (
+                <DropdownMenuItem onClick={() => onMoveToFolder(qr.id)}>
+                  <FolderInput className="mr-2 h-4 w-4" />
+                  Déplacer
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onDuplicate(qr)}>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Dupliquer
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleDelete}
-                  disabled={loading}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Supprimer
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleDelete}
+                disabled={loading}
+                className="text-red-600 focus:text-red-600"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Supprimer
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </Card>

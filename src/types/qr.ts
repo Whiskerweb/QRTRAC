@@ -86,8 +86,20 @@ export interface QRCodeRecord {
   logo_path: string | null;
   thumbnail_url: string | null;
   is_favorite: boolean;
+  scan_count: number;
+  folder_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface QRFolderNode {
+  id: string;
+  name: string;
+  color: string;
+  parent_id: string | null;
+  position: number;
+  qrCount: number;
+  children: QRFolderNode[];
 }
 
 export interface UserProfile {
