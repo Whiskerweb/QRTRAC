@@ -3,8 +3,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { motion } from 'framer-motion'
-import { fadeInUp, staggerContainer, staggerItem, springGentle } from '@/lib/animations'
 import {
     Plus, Search, Copy, Trash2, ExternalLink, Link2, Check,
     MousePointerClick, ChevronDown, AlertCircle, RefreshCw
@@ -161,14 +159,9 @@ export default function LinksPage() {
         : null
 
     return (
-        <motion.div
-            className="space-y-5 max-w-4xl"
-            initial="hidden"
-            animate="visible"
-            variants={staggerContainer}
-        >
+        <div className="space-y-5 max-w-4xl">
             {/* Header */}
-            <motion.div variants={fadeInUp} transition={springGentle} className="flex items-center justify-between">
+            <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-xl font-bold text-gray-900 tracking-tight">{t('links.title')}</h1>
                     <p className="text-[13px] text-gray-400 mt-0.5">
@@ -182,10 +175,10 @@ export default function LinksPage() {
                     <Plus className="w-4 h-4" />
                     {t('createLink')}
                 </button>
-            </motion.div>
+            </div>
 
             {/* Search + Campaign filter */}
-            <motion.div variants={fadeInUp} transition={springGentle} className="flex items-center gap-3">
+            <div className="flex items-center gap-3">
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
                     <input
@@ -255,11 +248,11 @@ export default function LinksPage() {
                         )}
                     </div>
                 )}
-            </motion.div>
+            </div>
 
             {/* Links list */}
             {loading ? (
-                <motion.div variants={fadeInUp} transition={springGentle} className="space-y-2">
+                <div className="space-y-2">
                     {[...Array(5)].map((_, i) => (
                         <div key={i} className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-4">
                             <div className="w-9 h-9 rounded-lg bg-gray-100 animate-pulse" />
@@ -270,9 +263,9 @@ export default function LinksPage() {
                             <div className="h-4 w-12 rounded bg-gray-100 animate-pulse" />
                         </div>
                     ))}
-                </motion.div>
+                </div>
             ) : loadError ? (
-                <motion.div variants={fadeInUp} transition={springGentle} className="bg-white rounded-xl border border-gray-200 px-6 py-16 text-center">
+                <div className="bg-white rounded-xl border border-gray-200 px-6 py-16 text-center">
                     <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
                         <AlertCircle className="w-6 h-6 text-red-400" />
                     </div>
@@ -285,9 +278,9 @@ export default function LinksPage() {
                         <RefreshCw className="w-3.5 h-3.5" />
                         Réessayer
                     </button>
-                </motion.div>
+                </div>
             ) : !links.length ? (
-                <motion.div variants={fadeInUp} transition={springGentle} className="bg-white rounded-xl border border-gray-200 px-6 py-20 text-center">
+                <div className="bg-white rounded-xl border border-gray-200 px-6 py-20 text-center">
                     <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
                         <Link2 className="w-6 h-6 text-gray-300" />
                     </div>
@@ -300,23 +293,16 @@ export default function LinksPage() {
                         <Plus className="w-4 h-4" />
                         {t('overview.createFirst')}
                     </button>
-                </motion.div>
+                </div>
             ) : (
-                <motion.div
-                    variants={staggerContainer}
-                    initial="hidden"
-                    animate="visible"
-                    className="space-y-1.5"
-                >
+                <div className="space-y-1.5">
                     {links.map((link) => {
                         const isCopied = copiedId === link.id
                         const isDeleting = deletingId === link.id
 
                         return (
-                            <motion.div
+                            <div
                                 key={link.id}
-                                variants={staggerItem}
-                                transition={springGentle}
                                 className="bg-white rounded-xl border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all group"
                             >
                                 <div className="flex items-center gap-3.5 px-4 py-3">
@@ -387,10 +373,10 @@ export default function LinksPage() {
                                         </button>
                                     </div>
                                 </div>
-                            </motion.div>
+                            </div>
                         )
                     })}
-                </motion.div>
+                </div>
             )}
 
             <CreateLinkModal
@@ -398,6 +384,6 @@ export default function LinksPage() {
                 onClose={() => setIsCreateModalOpen(false)}
                 onSuccess={refreshData}
             />
-        </motion.div>
+        </div>
     )
 }

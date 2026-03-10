@@ -3,8 +3,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
-import { fadeInUp, staggerContainer, staggerItem, springGentle } from '@/lib/animations'
 import {
     Plus, Megaphone, MousePointerClick, Link2,
     Trash2, Archive, X, AlertCircle, RefreshCw
@@ -116,14 +114,9 @@ export default function CampaignsPage() {
     }
 
     return (
-        <motion.div
-            className="space-y-6"
-            initial="hidden"
-            animate="visible"
-            variants={staggerContainer}
-        >
+        <div className="space-y-6">
             {/* Header */}
-            <motion.div variants={fadeInUp} transition={springGentle} className="flex items-center justify-between">
+            <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{t('campaigns.pageTitle')}</h1>
                     <p className="text-sm text-gray-500 mt-1">
@@ -137,7 +130,7 @@ export default function CampaignsPage() {
                     <Plus className="w-4 h-4" />
                     {t('campaigns.createNew')}
                 </button>
-            </motion.div>
+            </div>
 
             {/* Create Modal */}
             {showCreate && (
@@ -212,7 +205,7 @@ export default function CampaignsPage() {
 
             {/* Campaigns Grid */}
             {loading ? (
-                <motion.div variants={fadeInUp} transition={springGentle} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {[...Array(3)].map((_, i) => (
                         <div key={i} className="rounded-xl border border-gray-200 p-5">
                             <div className="h-5 w-32 rounded mb-2 bg-gray-200 animate-pulse" />
@@ -223,9 +216,9 @@ export default function CampaignsPage() {
                             </div>
                         </div>
                     ))}
-                </motion.div>
+                </div>
             ) : loadError ? (
-                <motion.div variants={fadeInUp} transition={springGentle} className="bg-white rounded-xl border border-gray-200 px-6 py-16 text-center">
+                <div className="bg-white rounded-xl border border-gray-200 px-6 py-16 text-center">
                     <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
                         <AlertCircle className="w-7 h-7 text-red-400" />
                     </div>
@@ -236,11 +229,11 @@ export default function CampaignsPage() {
                         className="btn-press inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition-colors"
                     >
                         <RefreshCw className="w-4 h-4" />
-                        Reessayer
+                        Réessayer
                     </button>
-                </motion.div>
+                </div>
             ) : campaigns.length === 0 ? (
-                <motion.div variants={fadeInUp} transition={springGentle} className="bg-white rounded-xl border border-gray-200 px-6 py-20 text-center">
+                <div className="bg-white rounded-xl border border-gray-200 px-6 py-20 text-center">
                     <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                         <Megaphone className="w-7 h-7 text-gray-400" />
                     </div>
@@ -253,19 +246,12 @@ export default function CampaignsPage() {
                         <Plus className="w-4 h-4" />
                         {t('campaigns.createFirst')}
                     </button>
-                </motion.div>
+                </div>
             ) : (
-                <motion.div
-                    variants={staggerContainer}
-                    initial="hidden"
-                    animate="visible"
-                    className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-                >
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {campaigns.map(c => (
-                        <motion.div
+                        <div
                             key={c.id}
-                            variants={staggerItem}
-                            transition={springGentle}
                             className="card-hover bg-white rounded-xl border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all group cursor-pointer"
                             onClick={() => router.push(`/dashboard/links?campaign_id=${c.id}`)}
                         >
@@ -278,7 +264,7 @@ export default function CampaignsPage() {
                                         />
                                         <h3 className="text-sm font-semibold text-gray-900 truncate">{c.name}</h3>
                                     </div>
-                                    <span className={`badge-pop text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${statusColor(c.status)}`}>
+                                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${statusColor(c.status)}`}>
                                         {c.status}
                                     </span>
                                 </div>
@@ -314,10 +300,10 @@ export default function CampaignsPage() {
                                     <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                             </div>
-                        </motion.div>
+                        </div>
                     ))}
-                </motion.div>
+                </div>
             )}
-        </motion.div>
+        </div>
     )
 }
