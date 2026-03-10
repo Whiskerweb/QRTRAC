@@ -116,7 +116,7 @@ export function QRCodeGrid() {
           <Star className={`mr-2 h-4 w-4 ${favoritesOnly ? 'fill-current' : ''}`} />
           Favoris
         </Button>
-        <Link href="/editor">
+        <Link href="/dashboard/editor">
           <Button size="sm">
             <Plus className="mr-2 h-4 w-4" />
             Nouveau QR
@@ -136,7 +136,7 @@ export function QRCodeGrid() {
               <p className="text-sm text-muted-foreground">
                 Créez votre premier QR code design
               </p>
-              <Link href="/editor">
+              <Link href="/dashboard/editor">
                 <Button>
                   <Plus className="mr-2 h-4 w-4" />
                   Créer un QR code

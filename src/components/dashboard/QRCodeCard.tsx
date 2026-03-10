@@ -98,7 +98,7 @@ export function QRCodeCard({ qr, onDelete, onDuplicate, onToggleFavorite }: QRCo
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem asChild>
-                  <Link href={`/editor/${qr.id}`} className="flex items-center">
+                  <Link href={`/dashboard/editor/${qr.id}`} className="flex items-center">
                     <Edit className="mr-2 h-4 w-4" />
                     Éditer
                   </Link>
