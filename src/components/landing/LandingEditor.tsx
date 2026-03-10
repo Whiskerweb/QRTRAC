@@ -5,7 +5,6 @@ import type QRCodeStyling from 'qr-code-styling';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { QRPreview } from '@/components/editor/QRPreview';
 import { ScannabilityScore } from '@/components/editor/ScannabilityScore';
@@ -13,7 +12,7 @@ import { useQREditor } from '@/hooks/useQREditor';
 import { QR_TEMPLATES } from '@/lib/qr/templates';
 import { createClient } from '@/lib/supabase/client';
 import type { DotsType, CornerSquareType, ContentType } from '@/types/qr';
-import { Download, Upload, X, Save, Loader2, Type, UserRound, Link2 } from 'lucide-react';
+import { Download, Upload, X, Save, Loader2, Type, UserRound, Link2, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 
 // --- Constants ---
@@ -93,20 +92,20 @@ function Swatches({
   onChange: (c: string) => void;
 }) {
   return (
-    <div className="flex items-center gap-1.5 flex-wrap">
+    <div className="flex items-center gap-1 flex-wrap">
       {colors.map((c) => (
         <button
           key={c}
           onClick={() => onChange(c)}
-          className={`w-6 h-6 rounded-full border-2 transition-all duration-150 hover:scale-110 ${
+          className={`w-5 h-5 rounded-full border transition-all duration-150 hover:scale-110 ${
             value.toLowerCase() === c.toLowerCase()
-              ? 'border-violet-500 ring-2 ring-violet-500/30 scale-110'
-              : 'border-gray-200 hover:border-violet-400'
+              ? 'border-gray-900 ring-1 ring-gray-900/20 scale-110'
+              : 'border-gray-200 hover:border-gray-400'
           }`}
           style={{ backgroundColor: c }}
         />
       ))}
-      <label className="relative w-6 h-6 cursor-pointer">
+      <label className="relative w-5 h-5 cursor-pointer">
         <input
           type="color"
           value={value}
@@ -114,7 +113,7 @@ function Swatches({
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
         />
         <span
-          className="block w-6 h-6 rounded-full border-2 border-dashed border-gray-300 hover:border-violet-400 transition-colors"
+          className="block w-5 h-5 rounded-full border border-dashed border-gray-300 hover:border-gray-400 transition-colors"
           style={{
             background: 'conic-gradient(from 0deg, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)',
           }}
@@ -124,7 +123,7 @@ function Swatches({
   );
 }
 
-function Pills<T extends string>({
+function MiniPills<T extends string>({
   options,
   value,
   onChange,
@@ -134,20 +133,56 @@ function Pills<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-1">
+    <div className="flex flex-wrap gap-0.5">
       {options.map((o) => (
         <button
           key={o.value}
           onClick={() => onChange(o.value)}
-          className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-150 ${
+          className={`px-2 py-0.5 rounded text-[10px] font-medium transition-all ${
             value === o.value
-              ? 'bg-violet-50 text-violet-700'
-              : 'text-gray-500 hover:bg-gray-50 hover:text-foreground'
+              ? 'bg-gray-900 text-white'
+              : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
           }`}
         >
           {o.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+function Section({
+  label,
+  children,
+  defaultOpen = true,
+}: {
+  label: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center justify-between w-full py-1"
+      >
+        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{label}</span>
+        <ChevronDown className={`w-3 h-3 text-gray-300 transition-transform ${open ? '' : '-rotate-90'}`} />
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="overflow-hidden"
+          >
+            <div className="pt-1.5 pb-1">{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -275,171 +310,92 @@ export function LandingEditor({ userId }: LandingEditorProps) {
   }
 
   return (
-    <div className="relative rounded-xl border border-gray-200 bg-white overflow-hidden h-full">
-      <div className="grid lg:grid-cols-[1fr,380px] gap-0 h-full">
-        {/* ====== LEFT — Controls ====== */}
-        <div className="p-5 lg:p-6 space-y-4 border-b lg:border-b-0 lg:border-r border-gray-100 overflow-y-auto">
-          {/* Content type toggle */}
+    <div className="grid lg:grid-cols-[1fr,320px] gap-0">
+      {/* ====== LEFT — Controls ====== */}
+      <div className="p-4 lg:p-5 space-y-3 border-b lg:border-b-0 lg:border-r border-gray-100 overflow-y-auto">
+        {/* Content type — compact tabs */}
+        <div className="flex gap-1 p-0.5 bg-gray-50 rounded-lg">
+          {[
+            { type: 'url' as const, icon: Link2, label: 'Lien' },
+            { type: 'text' as const, icon: Type, label: 'Texte' },
+            { type: 'vcard' as const, icon: UserRound, label: 'Contact' },
+          ].map(({ type, icon: Icon, label }) => (
+            <button
+              key={type}
+              onClick={() => handleContentTypeSwitch(type)}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-[11px] font-medium transition-all ${
+                state.contentType === type
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              <Icon className="h-3 w-3" />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content fields — compact */}
+        {state.contentType === 'url' && (
+          <Input
+            type="url"
+            placeholder="https://exemple.com"
+            value={state.contentData.url ?? ''}
+            onChange={(e) => update({ contentData: { url: e.target.value } })}
+            className="h-8 rounded-lg text-[12px] border-gray-200 placeholder:text-gray-300"
+          />
+        )}
+
+        {state.contentType === 'text' && (
+          <textarea
+            placeholder="Entrez votre texte..."
+            value={state.contentData.text ?? ''}
+            onChange={(e) => update({ contentData: { text: e.target.value } })}
+            className="w-full min-h-[60px] rounded-lg border border-gray-200 px-2.5 py-1.5 text-[12px] resize-none focus:outline-none focus:ring-1 focus:ring-gray-300 placeholder:text-gray-300"
+          />
+        )}
+
+        {state.contentType === 'vcard' && (
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-gray-500">Type de contenu</Label>
-            <div className="flex gap-1.5">
-              <button
-                onClick={() => handleContentTypeSwitch('url')}
-                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  state.contentType === 'url'
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                }`}
-              >
-                <Link2 className="h-4 w-4" />
-                Lien
-              </button>
-              <button
-                onClick={() => handleContentTypeSwitch('text')}
-                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  state.contentType === 'text'
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                }`}
-              >
-                <Type className="h-4 w-4" />
-                Texte
-              </button>
-              <button
-                onClick={() => handleContentTypeSwitch('vcard')}
-                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  state.contentType === 'vcard'
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                }`}
-              >
-                <UserRound className="h-4 w-4" />
-                Contact
-              </button>
+            <div className="grid grid-cols-2 gap-1.5">
+              <Input placeholder="Prenom" value={state.contentData.firstName ?? ''} onChange={(e) => update({ contentData: { ...state.contentData, firstName: e.target.value } })} className="h-7 rounded-lg text-[11px] border-gray-200 placeholder:text-gray-300" />
+              <Input placeholder="Nom" value={state.contentData.lastName ?? ''} onChange={(e) => update({ contentData: { ...state.contentData, lastName: e.target.value } })} className="h-7 rounded-lg text-[11px] border-gray-200 placeholder:text-gray-300" />
+            </div>
+            <Input placeholder="Telephone" value={state.contentData.phone ?? ''} onChange={(e) => update({ contentData: { ...state.contentData, phone: e.target.value } })} className="h-7 rounded-lg text-[11px] border-gray-200 placeholder:text-gray-300" />
+            <Input placeholder="Email" value={state.contentData.email ?? ''} onChange={(e) => update({ contentData: { ...state.contentData, email: e.target.value } })} className="h-7 rounded-lg text-[11px] border-gray-200 placeholder:text-gray-300" />
+            <div className="grid grid-cols-2 gap-1.5">
+              <Input placeholder="Organisation" value={state.contentData.organization ?? ''} onChange={(e) => update({ contentData: { ...state.contentData, organization: e.target.value } })} className="h-7 rounded-lg text-[11px] border-gray-200 placeholder:text-gray-300" />
+              <Input placeholder="Site web" value={state.contentData.website ?? ''} onChange={(e) => update({ contentData: { ...state.contentData, website: e.target.value } })} className="h-7 rounded-lg text-[11px] border-gray-200 placeholder:text-gray-300" />
             </div>
           </div>
+        )}
 
-          {/* Content fields */}
-          {state.contentType === 'url' && (
-            <div className="space-y-1.5">
-              <Label htmlFor="qr-url" className="text-xs font-medium text-gray-500">
-                URL
-              </Label>
-              <Input
-                id="qr-url"
-                type="url"
-                placeholder="https://exemple.com"
-                value={state.contentData.url ?? ''}
-                onChange={(e) => update({ contentData: { url: e.target.value } })}
-                className="h-9 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder:text-gray-400 text-sm"
-              />
-            </div>
-          )}
+        <div className="h-px bg-gray-100" />
 
-          {state.contentType === 'text' && (
-            <div className="space-y-1.5">
-              <Label htmlFor="qr-text" className="text-xs font-medium text-gray-500">
-                Votre texte
-              </Label>
-              <textarea
-                id="qr-text"
-                placeholder="Entrez votre texte ici..."
-                value={state.contentData.text ?? ''}
-                onChange={(e) => update({ contentData: { text: e.target.value } })}
-                className="w-full min-h-[80px] rounded-xl border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder:text-gray-400"
-              />
-            </div>
-          )}
-
-          {state.contentType === 'vcard' && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label className="text-xs font-medium text-gray-500">Prenom</Label>
-                  <Input
-                    placeholder="Jean"
-                    value={state.contentData.firstName ?? ''}
-                    onChange={(e) => update({ contentData: { ...state.contentData, firstName: e.target.value } })}
-                    className="h-9 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder:text-gray-400 text-sm"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs font-medium text-gray-500">Nom</Label>
-                  <Input
-                    placeholder="Dupont"
-                    value={state.contentData.lastName ?? ''}
-                    onChange={(e) => update({ contentData: { ...state.contentData, lastName: e.target.value } })}
-                    className="h-9 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder:text-gray-400 text-sm"
-                  />
-                </div>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs font-medium text-gray-500">Telephone</Label>
-                <Input
-                  type="tel"
-                  placeholder="+33 6 12 34 56 78"
-                  value={state.contentData.phone ?? ''}
-                  onChange={(e) => update({ contentData: { ...state.contentData, phone: e.target.value } })}
-                  className="h-9 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder:text-gray-400 text-sm"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs font-medium text-gray-500">Email</Label>
-                <Input
-                  type="email"
-                  placeholder="jean@exemple.com"
-                  value={state.contentData.email ?? ''}
-                  onChange={(e) => update({ contentData: { ...state.contentData, email: e.target.value } })}
-                  className="h-9 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder:text-gray-400 text-sm"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs font-medium text-gray-500">Organisation</Label>
-                <Input
-                  placeholder="Ma Societe"
-                  value={state.contentData.organization ?? ''}
-                  onChange={(e) => update({ contentData: { ...state.contentData, organization: e.target.value } })}
-                  className="h-9 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder:text-gray-400 text-sm"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs font-medium text-gray-500">Site web</Label>
-                <Input
-                  placeholder="https://mon-site.com"
-                  value={state.contentData.website ?? ''}
-                  onChange={(e) => update({ contentData: { ...state.contentData, website: e.target.value } })}
-                  className="h-9 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder:text-gray-400 text-sm"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Templates */}
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-gray-500">Template</Label>
-            <div className="flex flex-wrap gap-1.5">
-              {QR_TEMPLATES.map((tpl) => (
-                <button
-                  key={tpl.id}
-                  onClick={() => handleTemplate(tpl.id)}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs transition-all duration-150 ${
-                    activeTemplate === tpl.id
-                      ? 'bg-violet-50 text-violet-700 font-medium'
-                      : 'bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-foreground'
-                  }`}
-                >
-                  <span className="text-sm leading-none">{tpl.preview}</span>
-                  <span>{tpl.name}</span>
-                </button>
-              ))}
-            </div>
+        {/* Templates — horizontal scroll */}
+        <Section label="Style" defaultOpen={true}>
+          <div className="flex gap-1 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
+            {QR_TEMPLATES.map((tpl) => (
+              <button
+                key={tpl.id}
+                onClick={() => handleTemplate(tpl.id)}
+                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] whitespace-nowrap transition-all flex-shrink-0 ${
+                  activeTemplate === tpl.id
+                    ? 'bg-gray-900 text-white font-medium'
+                    : 'bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+                }`}
+              >
+                <span className="text-xs leading-none">{tpl.preview}</span>
+                {tpl.name}
+              </button>
+            ))}
           </div>
 
-          {/* Shapes row */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-gray-500">Modules</Label>
-              <Pills
+          {/* Shapes — inline */}
+          <div className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-2">
+            <div>
+              <span className="text-[10px] text-gray-400 mb-1 block">Modules</span>
+              <MiniPills
                 options={DOT_SHAPES}
                 value={state.dotsStyle.type}
                 onChange={(v) => {
@@ -448,9 +404,9 @@ export function LandingEditor({ userId }: LandingEditorProps) {
                 }}
               />
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-gray-500">Coins</Label>
-              <Pills
+            <div>
+              <span className="text-[10px] text-gray-400 mb-1 block">Coins</span>
+              <MiniPills
                 options={CORNER_SHAPES}
                 value={state.cornerSquaresStyle.type}
                 onChange={(v) => {
@@ -461,202 +417,177 @@ export function LandingEditor({ userId }: LandingEditorProps) {
             </div>
           </div>
 
-          {/* Colors row */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-gray-500">Couleur QR</Label>
+          {/* Colors — inline */}
+          <div className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-2">
+            <div>
+              <span className="text-[10px] text-gray-400 mb-1 block">Couleur</span>
               <Swatches colors={QR_COLORS} value={dotsColor} onChange={handleDotsColor} />
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-gray-500">Fond</Label>
-              <div className="space-y-1.5">
-                <div className={state.background.transparent ? 'opacity-40 pointer-events-none' : ''}>
-                  <Swatches colors={BG_COLORS} value={bgColor} onChange={handleBgColor} />
-                </div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] text-gray-400">Fond</span>
                 <button
                   onClick={toggleTransparent}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-150 ${
+                  className={`text-[9px] font-medium px-1.5 py-0.5 rounded transition-all ${
                     state.background.transparent
-                      ? 'bg-violet-50 text-violet-700'
-                      : 'text-gray-500 hover:bg-gray-50 hover:text-foreground'
+                      ? 'bg-gray-900 text-white'
+                      : 'text-gray-300 hover:text-gray-500'
                   }`}
                 >
-                  <span
-                    className="w-3.5 h-3.5 rounded-sm border border-gray-300 flex-shrink-0"
-                    style={{
-                      backgroundImage: 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)',
-                      backgroundSize: '6px 6px',
-                      backgroundPosition: '0 0, 0 3px, 3px -3px, -3px 0px',
-                    }}
-                  />
-                  Sans fond
+                  Transparent
                 </button>
+              </div>
+              <div className={state.background.transparent ? 'opacity-30 pointer-events-none' : ''}>
+                <Swatches colors={BG_COLORS} value={bgColor} onChange={handleBgColor} />
               </div>
             </div>
           </div>
+        </Section>
 
-          {/* Logo */}
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-gray-500">Logo</Label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/svg+xml,image/webp"
-              className="hidden"
-              onChange={handleLogoFile}
-            />
+        <div className="h-px bg-gray-100" />
 
-            <AnimatePresence mode="wait">
-              {state.logo.url ? (
-                <motion.div
-                  key="has-logo"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="space-y-3 overflow-hidden"
-                >
-                  <div className="flex items-center gap-2.5 p-2.5 rounded-lg bg-gray-50 border border-gray-200">
-                    <img
-                      src={state.logo.url}
-                      alt="Logo"
-                      className="w-9 h-9 object-contain rounded-md bg-white p-0.5"
+        {/* Logo — compact */}
+        <Section label="Logo" defaultOpen={false}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/svg+xml,image/webp"
+            className="hidden"
+            onChange={handleLogoFile}
+          />
+
+          <AnimatePresence mode="wait">
+            {state.logo.url ? (
+              <motion.div
+                key="has-logo"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="space-y-2"
+              >
+                <div className="flex items-center gap-2 p-1.5 rounded-lg bg-gray-50">
+                  <img src={state.logo.url} alt="Logo" className="w-7 h-7 object-contain rounded bg-white p-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-medium truncate">{state.logo.file?.name || 'Logo'}</p>
+                  </div>
+                  <button onClick={removeLogo} className="text-gray-300 hover:text-red-500 transition-colors p-0.5">
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[9px] text-gray-400">Taille</span>
+                      <span className="text-[9px] font-mono text-gray-300">{Math.round(state.logo.size * 100)}%</span>
+                    </div>
+                    <Slider
+                      min={10}
+                      max={40}
+                      step={1}
+                      value={[Math.round(state.logo.size * 100)]}
+                      onValueChange={([v]) => update({ logo: { ...state.logo, size: v / 100 } })}
                     />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate">{state.logo.file?.name || 'Logo'}</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {state.logo.file ? `${(state.logo.file.size / 1024).toFixed(0)} KB` : ''}
-                      </p>
-                    </div>
-                    <button onClick={removeLogo} className="text-muted-foreground hover:text-destructive transition-colors p-1">
-                      <X className="h-3.5 w-3.5" />
-                    </button>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-muted-foreground">Taille</span>
-                        <span className="text-[10px] font-mono text-muted-foreground">{Math.round(state.logo.size * 100)}%</span>
-                      </div>
-                      <Slider
-                        min={10}
-                        max={40}
-                        step={1}
-                        value={[Math.round(state.logo.size * 100)]}
-                        onValueChange={([v]) => update({ logo: { ...state.logo, size: v / 100 } })}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <span className="text-[10px] text-muted-foreground">Forme</span>
-                      <Pills
-                        options={[
-                          { value: 'square' as const, label: 'Carre' },
-                          { value: 'circle' as const, label: 'Rond' },
-                          { value: 'rounded' as const, label: 'Arrondi' },
-                        ]}
-                        value={state.logo.shape}
-                        onChange={(v) =>
-                          update({ logo: { ...state.logo, shape: v as 'square' | 'circle' | 'rounded' } })
-                        }
-                      />
-                    </div>
+                  <div>
+                    <span className="text-[9px] text-gray-400 block mb-1">Forme</span>
+                    <MiniPills
+                      options={[
+                        { value: 'square' as const, label: 'Carre' },
+                        { value: 'circle' as const, label: 'Rond' },
+                        { value: 'rounded' as const, label: 'Arrondi' },
+                      ]}
+                      value={state.logo.shape}
+                      onChange={(v) =>
+                        update({ logo: { ...state.logo, shape: v as 'square' | 'circle' | 'rounded' } })
+                      }
+                    />
                   </div>
-                </motion.div>
-              ) : (
-                <motion.button
-                  key="no-logo"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full flex items-center gap-2.5 p-2.5 rounded-lg border border-dashed border-gray-300 bg-white hover:bg-gray-50 transition-all duration-200 cursor-pointer group"
-                >
-                  <div className="w-9 h-9 rounded-md bg-violet-50 flex items-center justify-center group-hover:bg-violet-100 transition-colors">
-                    <Upload className="h-4 w-4 text-violet-600" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-xs font-medium">Ajouter un logo</p>
-                    <p className="text-[10px] text-muted-foreground">PNG, JPG, SVG</p>
-                  </div>
-                </motion.button>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Action buttons */}
-          <div className="flex gap-2">
-            {/* Format selector + Download */}
-            <div className="flex-1 flex gap-1.5">
-              <select
-                value={exportFormat}
-                onChange={(e) => setExportFormat(e.target.value as 'png' | 'svg')}
-                className="h-11 px-2.5 rounded-xl border border-gray-200 bg-gray-50 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                </div>
+              </motion.div>
+            ) : (
+              <motion.button
+                key="no-logo"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full flex items-center gap-2 p-2 rounded-lg border border-dashed border-gray-200 hover:border-gray-300 hover:bg-gray-50/50 transition-all cursor-pointer group"
               >
-                <option value="png">PNG</option>
-                <option value="svg">SVG</option>
-              </select>
-              <Button
-                size="lg"
-                className="flex-1 gap-2 h-11 rounded-lg text-sm font-semibold bg-gray-900 text-white hover:bg-gray-800 btn-press"
-                onClick={handleDownload}
-              >
-                <Download className="h-4 w-4" />
-                Telecharger
-              </Button>
-            </div>
-            {/* Save button (logged in only) */}
-            {userId && (
-              <Button
-                variant="outline"
-                size="lg"
-                className="h-11 rounded-lg text-sm gap-2 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 btn-press"
-                onClick={handleSave}
-                disabled={saving}
-              >
-                {saving ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}
-                Sauvegarder
-              </Button>
+                <div className="w-7 h-7 rounded bg-gray-50 flex items-center justify-center group-hover:bg-gray-100 transition-colors">
+                  <Upload className="h-3 w-3 text-gray-400" />
+                </div>
+                <div className="text-left">
+                  <p className="text-[10px] font-medium text-gray-500">Ajouter un logo</p>
+                  <p className="text-[9px] text-gray-300">PNG, JPG, SVG</p>
+                </div>
+              </motion.button>
             )}
-          </div>
-        </div>
+          </AnimatePresence>
+        </Section>
 
-        {/* ====== RIGHT — Preview ====== */}
-        <div className="relative flex flex-col items-center justify-center gap-4 p-5 lg:p-6 lg:sticky lg:top-20 lg:self-start bg-[#FAFAFA]">
-          {/* Preview frame */}
-          <motion.div
-            className="relative rounded-xl p-5 bg-white shadow-sm border border-gray-100"
-            layout
+        <div className="h-px bg-gray-100" />
+
+        {/* Actions — compact bottom bar */}
+        <div className="flex gap-1.5 pt-1">
+          <select
+            value={exportFormat}
+            onChange={(e) => setExportFormat(e.target.value as 'png' | 'svg')}
+            className="h-9 px-2 rounded-lg border border-gray-200 bg-gray-50 text-[11px] font-medium text-gray-600 focus:outline-none"
           >
-            {state.background.transparent && (
-              <div
-                className="absolute inset-0 rounded-lg"
-                style={{
-                  backgroundImage: 'linear-gradient(45deg, #e0e0e0 25%, transparent 25%), linear-gradient(-45deg, #e0e0e0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e0e0e0 75%), linear-gradient(-45deg, transparent 75%, #e0e0e0 75%)',
-                  backgroundSize: '16px 16px',
-                  backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px',
-                  backgroundColor: '#ffffff',
-                }}
-              />
-            )}
-            <div className="relative">
-              <QRPreview
-                state={state}
-                size={260}
-                onInstanceReady={(instance) => {
-                  qrInstance.current = instance;
-                }}
-              />
-            </div>
-          </motion.div>
+            <option value="png">PNG</option>
+            <option value="svg">SVG</option>
+          </select>
+          <Button
+            className="flex-1 gap-1.5 h-9 rounded-lg text-[12px] font-semibold bg-gray-900 text-white hover:bg-gray-800"
+            onClick={handleDownload}
+          >
+            <Download className="h-3.5 w-3.5" />
+            Telecharger
+          </Button>
+          {userId && (
+            <Button
+              variant="outline"
+              className="h-9 rounded-lg text-[12px] gap-1.5 border-gray-200 text-gray-500 hover:bg-gray-50"
+              onClick={handleSave}
+              disabled={saving}
+            >
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              Sauvegarder
+            </Button>
+          )}
+        </div>
+      </div>
 
-          {/* Scannability */}
-          <div className="w-full max-w-[260px]">
-            <ScannabilityScore state={state} />
+      {/* ====== RIGHT — Preview ====== */}
+      <div className="flex flex-col items-center justify-center gap-3 p-4 lg:p-5 lg:sticky lg:top-20 lg:self-start bg-gray-50/50">
+        <motion.div
+          className="relative rounded-xl p-4 bg-white shadow-sm border border-gray-100"
+          layout
+        >
+          {state.background.transparent && (
+            <div
+              className="absolute inset-0 rounded-xl"
+              style={{
+                backgroundImage: 'linear-gradient(45deg, #e5e5e5 25%, transparent 25%), linear-gradient(-45deg, #e5e5e5 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e5e5e5 75%), linear-gradient(-45deg, transparent 75%, #e5e5e5 75%)',
+                backgroundSize: '12px 12px',
+                backgroundPosition: '0 0, 0 6px, 6px -6px, -6px 0px',
+                backgroundColor: '#fff',
+              }}
+            />
+          )}
+          <div className="relative">
+            <QRPreview
+              state={state}
+              size={220}
+              onInstanceReady={(instance) => {
+                qrInstance.current = instance;
+              }}
+            />
           </div>
+        </motion.div>
+
+        <div className="w-full max-w-[220px]">
+          <ScannabilityScore state={state} />
         </div>
       </div>
     </div>
