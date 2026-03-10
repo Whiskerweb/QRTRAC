@@ -21,6 +21,7 @@ import { getMarketingLinks } from '@/app/actions/marketing-links'
 import { getChannelConfig } from '@/lib/marketing/channels'
 import { subDays, format } from 'date-fns'
 import { AnalyticsChart } from '@/components/dashboard/AnalyticsChart'
+import { toast } from 'sonner'
 
 // =============================================
 // TYPES & FETCHER
@@ -430,29 +431,30 @@ export default function AnalyticsPage() {
     const { data: kpiData, mutate, isValidating } = useSWR<KPIResponse>(
         `/api/stats/kpi?source=marketing&date_from=${dateFrom}&date_to=${dateTo}${buildKpiFilterParams()}`,
         kpiFetcher,
-        { revalidateOnFocus: false }
+        { revalidateOnFocus: false, onError: () => toast.error('Erreur de chargement des statistiques') }
     )
 
     // Fetch breakdowns
+    const swrOpts = { revalidateOnFocus: false, onError: () => toast.error('Erreur de chargement') }
     const { data: countriesData } = useSWR(
         `/api/stats/breakdown?source=marketing&dimension=countries&date_from=${dateFrom}&date_to=${dateTo}${buildFilterParams('country')}`,
-        breakdownFetcher, { revalidateOnFocus: false }
+        breakdownFetcher, swrOpts
     )
     const { data: citiesData } = useSWR(
         `/api/stats/breakdown?source=marketing&dimension=cities&date_from=${dateFrom}&date_to=${dateTo}${buildFilterParams('city')}`,
-        breakdownFetcher, { revalidateOnFocus: false }
+        breakdownFetcher, swrOpts
     )
     const { data: devicesData } = useSWR(
         `/api/stats/breakdown?source=marketing&dimension=devices&date_from=${dateFrom}&date_to=${dateTo}${buildFilterParams('device')}`,
-        breakdownFetcher, { revalidateOnFocus: false }
+        breakdownFetcher, swrOpts
     )
     const { data: browsersData } = useSWR(
         `/api/stats/breakdown?source=marketing&dimension=browsers&date_from=${dateFrom}&date_to=${dateTo}${buildFilterParams('browser')}`,
-        breakdownFetcher, { revalidateOnFocus: false }
+        breakdownFetcher, swrOpts
     )
     const { data: osData } = useSWR(
         `/api/stats/breakdown?source=marketing&dimension=os&date_from=${dateFrom}&date_to=${dateTo}${buildFilterParams('os')}`,
-        breakdownFetcher, { revalidateOnFocus: false }
+        breakdownFetcher, swrOpts
     )
 
     // Process API data

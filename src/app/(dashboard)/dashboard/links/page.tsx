@@ -19,6 +19,7 @@ import { CreateLinkModal } from '@/components/marketing/CreateLinkModal'
 import { FolderSidebar } from '@/components/marketing/FolderSidebar'
 import { CampaignManager } from '@/components/marketing/CampaignManager'
 import { BulkActionBar } from '@/components/marketing/BulkActionBar'
+import { toast } from 'sonner'
 
 /** Deterministic mock leads/sales from link ID + clicks */
 function getMockLeadsSales(linkId: string, clicks: number) {
@@ -151,17 +152,22 @@ export default function LinksPage() {
     useEffect(() => { loadTags() }, [loadTags])
 
     const loadLinks = useCallback(async () => {
-        const res = await getMarketingLinks({
-            search: search || undefined,
-            channel: activeChannel || undefined,
-            campaign_id: activeCampaignId || undefined,
-            folder_id: activeFolderId !== null ? activeFolderId : undefined,
-            tagIds: activeTagIds.length ? activeTagIds : undefined,
-        })
-        if (res.success) {
-            setLinks(res.data as unknown as MarketingLink[])
+        try {
+            const res = await getMarketingLinks({
+                search: search || undefined,
+                channel: activeChannel || undefined,
+                campaign_id: activeCampaignId || undefined,
+                folder_id: activeFolderId !== null ? activeFolderId : undefined,
+                tagIds: activeTagIds.length ? activeTagIds : undefined,
+            })
+            if (res.success) {
+                setLinks(res.data as unknown as MarketingLink[])
+            }
+        } catch {
+            toast.error('Erreur lors du chargement des liens')
+        } finally {
+            setLoading(false)
         }
-        setLoading(false)
     }, [search, activeChannel, activeCampaignId, activeFolderId, activeTagIds])
 
     useEffect(() => {
@@ -199,11 +205,18 @@ export default function LinksPage() {
 
     const handleDelete = async (id: string) => {
         setDeletingId(id)
-        const res = await deleteMarketingLink(id)
-        if (res.success) {
-            setLinks(prev => prev.filter(l => l.id !== id))
-            setTotalLinks(prev => prev - 1)
-            setSelectedIds(prev => { const next = new Set(prev); next.delete(id); return next })
+        try {
+            const res = await deleteMarketingLink(id)
+            if (res.success) {
+                setLinks(prev => prev.filter(l => l.id !== id))
+                setTotalLinks(prev => prev - 1)
+                setSelectedIds(prev => { const next = new Set(prev); next.delete(id); return next })
+                toast.success('Lien supprime')
+            } else {
+                toast.error(res.error || 'Erreur lors de la suppression')
+            }
+        } catch {
+            toast.error('Erreur lors de la suppression')
         }
         setDeletingId(null)
     }

@@ -7,10 +7,11 @@ import { motion } from 'framer-motion'
 import { fadeInUp, staggerContainer, staggerItem, springGentle } from '@/lib/animations'
 import {
     Plus, Megaphone, MousePointerClick, Link2,
-    Trash2, Archive, X
+    Trash2, Archive, X, AlertCircle, RefreshCw
 } from 'lucide-react'
 import { getMarketingCampaignList, createMarketingCampaign, updateMarketingCampaign, deleteMarketingCampaign } from '@/app/actions/marketing-campaigns'
 import { TAG_COLORS } from '@/lib/marketing/tags'
+import { toast } from 'sonner'
 
 interface CampaignData {
     id: string
@@ -30,6 +31,7 @@ export default function CampaignsPage() {
     const router = useRouter()
     const [campaigns, setCampaigns] = useState<CampaignData[]>([])
     const [loading, setLoading] = useState(true)
+    const [loadError, setLoadError] = useState(false)
     const [showCreate, setShowCreate] = useState(false)
     const [creating, setCreating] = useState(false)
 
@@ -40,12 +42,15 @@ export default function CampaignsPage() {
 
     const loadCampaigns = useCallback(async () => {
         try {
+            setLoadError(false)
             const res = await getMarketingCampaignList()
             if (res.success && res.data) {
                 setCampaigns(res.data as unknown as CampaignData[])
+            } else {
+                setLoadError(true)
             }
-        } catch (err) {
-            console.error('[campaigns] Failed to load:', err)
+        } catch {
+            setLoadError(true)
         } finally {
             setLoading(false)
         }
@@ -56,27 +61,48 @@ export default function CampaignsPage() {
     const handleCreate = async () => {
         if (!newName.trim()) return
         setCreating(true)
-        await createMarketingCampaign({
-            name: newName.trim(),
-            description: newDesc.trim() || undefined,
-            color: newColor,
-        })
-        setNewName('')
-        setNewDesc('')
-        setNewColor(TAG_COLORS[4].hex)
-        setShowCreate(false)
-        setCreating(false)
-        loadCampaigns()
+        try {
+            const res = await createMarketingCampaign({
+                name: newName.trim(),
+                description: newDesc.trim() || undefined,
+                color: newColor,
+            })
+            if (!res.success) {
+                toast.error(res.error || 'Erreur lors de la creation')
+                return
+            }
+            toast.success('Campagne creee')
+            setNewName('')
+            setNewDesc('')
+            setNewColor(TAG_COLORS[4].hex)
+            setShowCreate(false)
+            loadCampaigns()
+        } catch {
+            toast.error('Erreur lors de la creation')
+        } finally {
+            setCreating(false)
+        }
     }
 
     const handleArchive = async (id: string) => {
-        await updateMarketingCampaign(id, { status: 'ARCHIVED' })
-        loadCampaigns()
+        const res = await updateMarketingCampaign(id, { status: 'ARCHIVED' })
+        if (res.success) {
+            toast.success('Campagne archivee')
+            loadCampaigns()
+        } else {
+            toast.error(res.error || 'Erreur')
+        }
     }
 
     const handleDelete = async (id: string) => {
-        await deleteMarketingCampaign(id)
-        loadCampaigns()
+        if (!confirm('Supprimer cette campagne ?')) return
+        const res = await deleteMarketingCampaign(id)
+        if (res.success) {
+            toast.success('Campagne supprimee')
+            loadCampaigns()
+        } else {
+            toast.error(res.error || 'Erreur')
+        }
     }
 
     const statusColor = (status: string) => {
@@ -197,6 +223,21 @@ export default function CampaignsPage() {
                             </div>
                         </div>
                     ))}
+                </motion.div>
+            ) : loadError ? (
+                <motion.div variants={fadeInUp} transition={springGentle} className="bg-white rounded-xl border border-gray-200 px-6 py-16 text-center">
+                    <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <AlertCircle className="w-7 h-7 text-red-400" />
+                    </div>
+                    <h3 className="text-base font-semibold text-gray-900 mb-1">Erreur de chargement</h3>
+                    <p className="text-sm text-gray-500 mb-4">Impossible de charger les campagnes.</p>
+                    <button
+                        onClick={() => { setLoading(true); loadCampaigns() }}
+                        className="btn-press inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition-colors"
+                    >
+                        <RefreshCw className="w-4 h-4" />
+                        Reessayer
+                    </button>
                 </motion.div>
             ) : campaigns.length === 0 ? (
                 <motion.div variants={fadeInUp} transition={springGentle} className="bg-white rounded-xl border border-gray-200 px-6 py-20 text-center">

@@ -1,6 +1,5 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentUserWorkspace } from '@/lib/workspace'
 import { nanoid } from 'nanoid'
@@ -132,7 +131,7 @@ export async function createMarketingLink(input: MarketingLinkInput) {
             ogImage: input.og_image || null,
         }, input.domain)
 
-        revalidatePath('/dashboard/links')
+    
 
         const base = input.domain ? `https://${input.domain}` : await getShortLinkBase(workspace.workspaceId)
         return {
@@ -386,7 +385,7 @@ export async function updateMarketingLink(id: string, input: Partial<MarketingLi
         ogImage: updated.og_image || null,
     }, input.domain)
 
-    revalidatePath('/dashboard/links')
+
     return { success: true, data: updated }
 }
 
@@ -408,7 +407,7 @@ export async function deleteMarketingLink(id: string) {
     const { deleteLinkFromRedis } = await import('@/lib/redis')
     await deleteLinkFromRedis(link.slug)
 
-    revalidatePath('/dashboard/links')
+
     return { success: true }
 }
 
@@ -493,7 +492,7 @@ export async function createMarketingTag(name: string, color: string) {
     }).select().single()
 
     if (error) return { success: false, error: 'Tag name already exists' }
-    revalidatePath('/dashboard/links')
+
     return { success: true, data: tag }
 }
 
@@ -511,7 +510,7 @@ export async function updateMarketingTag(id: string, data: { name?: string; colo
 
     const { data: updated, error } = await supabase.from('MarketingTag').update(updateData).eq('id', id).select().single()
     if (error) return { success: false, error: 'Tag name already exists' }
-    revalidatePath('/dashboard/links')
+
     return { success: true, data: updated }
 }
 
@@ -525,7 +524,7 @@ export async function deleteMarketingTag(id: string) {
 
     await supabase.from('_MarketingTagToShortLink').delete().eq('A', id)
     await supabase.from('MarketingTag').delete().eq('id', id)
-    revalidatePath('/dashboard/links')
+
     return { success: true }
 }
 
@@ -576,7 +575,7 @@ export async function setLinkTags(linkId: string, tagIds: string[]) {
         )
     }
 
-    revalidatePath('/dashboard/links')
+
     return { success: true }
 }
 
@@ -644,7 +643,7 @@ export async function bulkDeleteLinks(linkIds: string[]) {
     const { deleteLinkFromRedis } = await import('@/lib/redis')
     await Promise.all(links.map(l => deleteLinkFromRedis(l.slug)))
 
-    revalidatePath('/dashboard/links')
+
     return { success: true }
 }
 
@@ -653,7 +652,7 @@ export async function bulkMoveToFolder(linkIds: string[], folderId: string | nul
     if ('error' in result) return { success: false, error: result.error }
 
     await result.supabase.from('ShortLink').update({ folder_id: folderId }).in('id', linkIds)
-    revalidatePath('/dashboard/links')
+
     return { success: true }
 }
 
@@ -669,7 +668,7 @@ export async function bulkSetCampaign(linkIds: string[], campaignId: string | nu
     }
 
     await result.supabase.from('ShortLink').update({ campaign_id: campaignId, campaign: campaignName }).in('id', linkIds)
-    revalidatePath('/dashboard/links')
+
     return { success: true }
 }
 
@@ -699,7 +698,7 @@ export async function bulkAddTags(linkIds: string[], tagIds: string[]) {
         await result.supabase.from('_MarketingTagToShortLink').insert(inserts)
     }
 
-    revalidatePath('/dashboard/links')
+
     return { success: true }
 }
 
@@ -713,6 +712,6 @@ export async function bulkRemoveTags(linkIds: string[], tagIds: string[]) {
         .in('B', linkIds)
         .in('A', tagIds)
 
-    revalidatePath('/dashboard/links')
+
     return { success: true }
 }

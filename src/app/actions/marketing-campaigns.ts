@@ -1,6 +1,5 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentUserWorkspace } from '@/lib/workspace'
 import type { CampaignStatus } from '@/types/marketing'
@@ -31,7 +30,7 @@ export async function createMarketingCampaign(input: CreateCampaignInput) {
     }).select().single()
 
     if (error) return { success: false, error: 'Campaign name already exists' }
-    revalidatePath('/dashboard/campaigns')
+
     return { success: true, data: campaign }
 }
 
@@ -68,7 +67,7 @@ export async function updateMarketingCampaign(id: string, input: UpdateCampaignI
         await supabase.from('ShortLink').update({ campaign: input.name.trim() }).eq('campaign_id', id)
     }
 
-    revalidatePath('/dashboard/campaigns')
+
     return { success: true, data: updated }
 }
 
@@ -83,7 +82,7 @@ export async function deleteMarketingCampaign(id: string) {
     await supabase.from('ShortLink').update({ campaign_id: null, campaign: null }).eq('campaign_id', id)
     await supabase.from('MarketingCampaign').delete().eq('id', id)
 
-    revalidatePath('/dashboard/campaigns')
+
     return { success: true }
 }
 

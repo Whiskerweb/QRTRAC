@@ -13,6 +13,7 @@ import {
     Globe, Monitor
 } from 'lucide-react'
 import { getMarketingLink, deleteMarketingLink, updateMarketingLink } from '@/app/actions/marketing-links'
+import { toast } from 'sonner'
 import { getChannelConfig, PREDEFINED_CHANNELS } from '@/lib/marketing/channels'
 import { getTagColor } from '@/lib/marketing/tags'
 import { CampaignSelect } from '@/components/marketing/CampaignSelect'
@@ -96,6 +97,9 @@ export default function LinkDetailPage() {
                 setLink(res.data as unknown as LinkData)
             }
             setLoading(false)
+        }).catch(() => {
+            toast.error('Erreur lors du chargement du lien')
+            setLoading(false)
         })
     }, [linkId])
 
@@ -138,10 +142,13 @@ export default function LinkDetailPage() {
     }
 
     const handleDelete = async () => {
-        if (!link) return
+        if (!link || !confirm('Supprimer ce lien ?')) return
         const res = await deleteMarketingLink(link.id)
         if (res.success) {
+            toast.success('Lien supprime')
             router.push('/dashboard/links')
+        } else {
+            toast.error(res.error || 'Erreur lors de la suppression')
         }
     }
 

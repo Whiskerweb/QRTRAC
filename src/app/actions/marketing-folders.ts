@@ -1,6 +1,5 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentUserWorkspace } from '@/lib/workspace'
 
@@ -59,7 +58,7 @@ export async function createMarketingFolder(input: CreateFolderInput) {
     }).select().single()
 
     if (error) return { success: false, error: 'Folder name already exists in this location' }
-    revalidatePath('/dashboard/links')
+
     return { success: true, data: folder }
 }
 
@@ -77,7 +76,7 @@ export async function updateMarketingFolder(id: string, input: { name?: string; 
 
     const { data: updated, error } = await supabase.from('MarketingFolder').update(data).eq('id', id).select().single()
     if (error) return { success: false, error: 'Folder name already exists' }
-    revalidatePath('/dashboard/links')
+
     return { success: true, data: updated }
 }
 
@@ -103,7 +102,7 @@ export async function deleteMarketingFolder(id: string) {
 
     await supabase.from('MarketingFolder').delete().eq('id', id)
 
-    revalidatePath('/dashboard/links')
+
     return { success: true }
 }
 
