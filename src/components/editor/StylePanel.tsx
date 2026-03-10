@@ -2,7 +2,7 @@
 
 import { useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Circle, Minus, Sun, ChevronDown, Upload, X } from 'lucide-react';
+import { Circle, Minus, Sun, ChevronDown, Upload, X, ImagePlus } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import type { QREditorState, ColorConfig, DotsType, CornerSquareType, CornerDotType } from '@/types/qr';
 
@@ -273,7 +273,7 @@ async function resizeImage(file: File, maxSizeBytes: number): Promise<string> {
   });
 }
 
-function LogoSection({
+export function LogoSection({
   state,
   onUpdate,
 }: {
@@ -509,13 +509,6 @@ export function StylePanel({ state, onUpdate }: StylePanelProps) {
             onChange={(color) => onUpdate({ background: { ...state.background, color } })}
           />
         )}
-      </Section>
-
-      <div className="h-px bg-gray-100" />
-
-      {/* Logo */}
-      <Section title="Logo">
-        <LogoSection state={state} onUpdate={onUpdate} />
       </Section>
 
       <div className="h-px bg-gray-100" />
