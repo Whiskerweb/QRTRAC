@@ -46,10 +46,10 @@ export async function GET(request: NextRequest) {
         // Slight upward trend over time
         const trendMultiplier = 1 + (i / daysDiff) * 0.3
 
-        const baseClicks = Math.floor((rand() * 35 + 15) * weekdayMultiplier * trendMultiplier)
-        const baseLeads = Math.floor(baseClicks * (rand() * 0.08 + 0.02))
-        const baseSales = rand() > 0.6 ? Math.floor(rand() * 3) + 1 : 0
-        const baseRevenue = baseSales * Math.floor(rand() * 4000 + 1000)
+        const baseClicks = Math.floor((rand() * 80 + 40) * weekdayMultiplier * trendMultiplier)
+        const baseLeads = Math.floor(baseClicks * (rand() * 0.15 + 0.08))
+        const baseSales = Math.floor(baseClicks * (rand() * 0.06 + 0.02))
+        const baseRevenue = baseSales * Math.floor(rand() * 4500 + 1500)
 
         timeseries.push({
             date: date.toISOString().split('T')[0],

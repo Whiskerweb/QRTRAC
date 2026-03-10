@@ -7,12 +7,17 @@ export async function getCurrentUserWorkspace() {
     if (authError || !user) return null
 
     // Try existing workspace membership (Traaaction startup user)
-    const { data: membership } = await supabase
+    // Use maybeSingle() to avoid 406 error when no rows found
+    const { data: membership, error: memberError } = await supabase
         .from('WorkspaceMember')
         .select('workspace_id')
         .eq('user_id', user.id)
         .limit(1)
-        .single()
+        .maybeSingle()
+
+    if (memberError) {
+        console.warn('[workspace] WorkspaceMember query failed:', memberError.message)
+    }
 
     if (membership) {
         return { workspaceId: membership.workspace_id, userId: user.id }

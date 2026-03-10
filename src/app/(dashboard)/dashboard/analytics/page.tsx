@@ -15,15 +15,12 @@ import {
     ChevronDown,
     X,
     TrendingUp,
-    MousePointerClick,
-    DollarSign,
-    Users2,
 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { getMarketingLinks } from '@/app/actions/marketing-links'
 import { getChannelConfig } from '@/lib/marketing/channels'
 import { subDays, format } from 'date-fns'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts'
+import { AnalyticsChart } from '@/components/dashboard/AnalyticsChart'
 
 // =============================================
 // TYPES & FETCHER
@@ -607,13 +604,7 @@ export default function AnalyticsPage() {
         return () => window.removeEventListener('keydown', handleKeyDown)
     }, [activeFilters.length, activeEventTypes.size, clearAllFilters])
 
-    // KPI cards config
-    const kpiCards = [
-        { label: 'Clicks', value: kpi.clicks, icon: MousePointerClick, color: 'text-blue-600', bg: 'bg-blue-50', key: 'clicks' as const },
-        { label: 'Leads', value: kpi.leads, icon: Users2, color: 'text-green-600', bg: 'bg-green-50', key: 'leads' as const },
-        { label: 'Sales', value: kpi.sales, icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50', key: 'sales' as const },
-        { label: 'Revenue', value: kpi.revenue, icon: DollarSign, color: 'text-amber-600', bg: 'bg-amber-50', key: 'revenue' as const },
-    ]
+    // KPI values passed to funnel chart
 
     return (
         <motion.div
@@ -706,78 +697,23 @@ export default function AnalyticsPage() {
                 </div>
             )}
 
-            {/* ===== KPI CARDS + CHART ===== */}
+            {/* ===== FUNNEL + TIMELINE CHART ===== */}
             <motion.div variants={fadeInUp} transition={springGentle}>
-                <div className="bg-white/70 backdrop-blur-sm border border-gray-200/60 rounded-2xl overflow-hidden shadow-sm shadow-black/[0.02]">
-                    {/* KPI Row */}
-                    <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-gray-100">
-                        {kpiCards.map((card) => {
-                            const Icon = card.icon
-                            const isActive = activeEventTypes.has(card.key) || card.key === 'revenue'
-                            return (
-                                <button
-                                    key={card.key}
-                                    onClick={() => card.key !== 'revenue' && toggleEventType(card.key)}
-                                    className={`px-5 py-4 text-left transition-all ${
-                                        isActive ? '' : 'opacity-40'
-                                    } ${card.key !== 'revenue' ? 'hover:bg-gray-50/50 cursor-pointer' : 'cursor-default'}`}
-                                >
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <div className={`w-7 h-7 rounded-lg ${card.bg} flex items-center justify-center`}>
-                                            <Icon className={`w-3.5 h-3.5 ${card.color}`} />
-                                        </div>
-                                        <span className="text-[12px] text-gray-400 font-medium uppercase tracking-wide">{card.label}</span>
-                                    </div>
-                                    <p className="text-2xl font-semibold text-gray-900 tabular-nums">
-                                        {card.key === 'revenue'
-                                            ? `${(card.value / 100).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u{20AC}`
-                                            : formatNumber(card.value)
-                                        }
-                                    </p>
-                                </button>
-                            )
-                        })}
-                    </div>
-
-                    {/* Timeseries Chart */}
-                    {displayTimeseries.length > 0 && (
-                        <div className="px-5 pb-5 pt-2 border-t border-gray-100">
-                            <ResponsiveContainer width="100%" height={240}>
-                                <AreaChart data={displayTimeseries} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                    <defs>
-                                        <linearGradient id="clicksGrad" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#6366f1" stopOpacity={0.15} />
-                                            <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                                        </linearGradient>
-                                        <linearGradient id="leadsGrad" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#22c55e" stopOpacity={0.15} />
-                                            <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-                                        </linearGradient>
-                                        <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#a855f7" stopOpacity={0.15} />
-                                            <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-                                    <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-                                    <Tooltip
-                                        contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', fontSize: 12 }}
-                                    />
-                                    {activeEventTypes.has('clicks') && (
-                                        <Area type="monotone" dataKey="clicks" stroke="#6366f1" strokeWidth={2} fill="url(#clicksGrad)" dot={false} />
-                                    )}
-                                    {activeEventTypes.has('leads') && (
-                                        <Area type="monotone" dataKey="leads" stroke="#22c55e" strokeWidth={2} fill="url(#leadsGrad)" dot={false} />
-                                    )}
-                                    {activeEventTypes.has('sales') && (
-                                        <Area type="monotone" dataKey="sales" stroke="#a855f7" strokeWidth={2} fill="url(#salesGrad)" dot={false} />
-                                    )}
-                                </AreaChart>
-                            </ResponsiveContainer>
-                        </div>
-                    )}
-                </div>
+                <AnalyticsChart
+                    clicks={kpi.clicks}
+                    leads={kpi.leads}
+                    sales={kpi.sales}
+                    revenue={kpi.revenue}
+                    timeseries={displayTimeseries}
+                    activeEventTypes={activeEventTypes}
+                    onEventTypeToggle={toggleEventType}
+                    selectedDays={selectedRange.days}
+                    onRangeChange={(days) => {
+                        const range = DATE_RANGES.find(r => r.days === days)
+                        if (range) setSelectedRangeValue(range.value)
+                    }}
+                    loadingTimeseries={isValidating}
+                />
             </motion.div>
 
             {/* ===== BREAKDOWNS GRID ===== */}
