@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Edit, Copy, Trash2, Star, ScanLine, FolderInput } from 'lucide-react';
 import type { QRCodeRecord } from '@/types/qr';
+import { QRCardPreview } from './QRCardPreview';
 
 interface QRCodeCardProps {
   qr: QRCodeRecord;
@@ -68,17 +69,7 @@ export function QRCodeCard({
     >
       {/* Thumbnail */}
       <div className="relative bg-gray-50 flex items-center justify-center h-40 border-b border-gray-100">
-        {qr.thumbnail_url ? (
-          <img
-            src={qr.thumbnail_url}
-            alt={qr.name}
-            className="w-32 h-32 object-contain"
-          />
-        ) : (
-          <div className="w-32 h-32 bg-gray-100 rounded-lg flex items-center justify-center">
-            <span className="text-4xl text-gray-300">▪</span>
-          </div>
-        )}
+        <QRCardPreview qr={qr} size={120} />
 
         {/* Hover overlay */}
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/[0.03] transition-colors" />
