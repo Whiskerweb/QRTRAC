@@ -7,9 +7,10 @@ import { QRBulkActionBar } from './QRBulkActionBar';
 import { CreateQRModal } from './CreateQRModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Star } from 'lucide-react';
+import { Plus, Search, Star, Download } from 'lucide-react';
 import type { QRCodeRecord } from '@/types/qr';
 import { toast } from 'sonner';
+import { seedDemoQRCodes } from '@/app/actions/qr-codes';
 
 interface QRCodeGridProps {
   activeFolderId: string | null;
@@ -25,6 +26,7 @@ export function QRCodeGrid({ activeFolderId, onMoveToFolder, onQrCountChange }: 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingQrId, setEditingQrId] = useState<string | undefined>(undefined);
+  const [seeding, setSeeding] = useState(false);
   const supabase = createClient();
 
   const fetchQRCodes = useCallback(async () => {
@@ -133,6 +135,23 @@ export function QRCodeGrid({ activeFolderId, onMoveToFolder, onQrCountChange }: 
     setEditingQrId(undefined);
   };
 
+  const handleSeedDemo = async () => {
+    setSeeding(true);
+    try {
+      const res = await seedDemoQRCodes();
+      if (res.success) {
+        toast.success(`${res.count} QR codes demo installés`);
+        fetchQRCodes();
+      } else {
+        toast.error(res.error || 'Erreur lors de l\'installation');
+      }
+    } catch {
+      toast.error('Erreur lors de l\'installation');
+    } finally {
+      setSeeding(false);
+    }
+  };
+
   const folderFiltered = qrCodes.filter(q => {
     if (activeFolderId === null) return true;
     if (activeFolderId === 'uncategorized') return !q.folder_id;
@@ -199,15 +218,25 @@ export function QRCodeGrid({ activeFolderId, onMoveToFolder, onQrCountChange }: 
                 Aucun QR code pour l&apos;instant
               </p>
               <p className="text-sm text-gray-400">
-                Créez votre premier QR code design
+                Créez votre premier QR code ou installez des exemples
               </p>
-              <Button
-                className="bg-gray-900 hover:bg-gray-800 text-white mt-2"
-                onClick={() => { setEditingQrId(undefined); setShowCreateModal(true); }}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Créer un QR code
-              </Button>
+              <div className="flex items-center justify-center gap-3 mt-3">
+                <Button
+                  className="bg-gray-900 hover:bg-gray-800 text-white"
+                  onClick={() => { setEditingQrId(undefined); setShowCreateModal(true); }}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Créer un QR code
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleSeedDemo}
+                  disabled={seeding}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  {seeding ? 'Installation...' : 'Installer des exemples'}
+                </Button>
+              </div>
             </>
           ) : (
             <p className="text-gray-400">Aucun résultat pour cette recherche</p>
