@@ -1,18 +1,23 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter, useParams } from 'next/navigation'
+import useSWR from 'swr'
+import { motion } from 'framer-motion'
+import { fadeInUp, staggerContainer, springGentle } from '@/lib/animations'
+import { subDays, format } from 'date-fns'
 import {
     ArrowLeft, Copy, ExternalLink,
-    MousePointerClick,
-    Check, Link2, Calendar, Tag, Trash2, Pencil, Folder
+    Check, Link2, Calendar, Tag, Trash2, Pencil, Folder,
+    Globe, Monitor
 } from 'lucide-react'
 import { getMarketingLink, deleteMarketingLink, updateMarketingLink } from '@/app/actions/marketing-links'
 import { getChannelConfig, PREDEFINED_CHANNELS } from '@/lib/marketing/channels'
 import { getTagColor } from '@/lib/marketing/tags'
 import { CampaignSelect } from '@/components/marketing/CampaignSelect'
 import { FolderSelect } from '@/components/marketing/FolderSelect'
+import { AnalyticsChart } from '@/components/dashboard/AnalyticsChart'
 
 interface LinkData {
     id: string
@@ -35,6 +40,43 @@ interface LinkData {
     Folder: { id: string; name: string; color: string | null } | null
 }
 
+interface KPIData {
+    clicks: number
+    leads: number
+    sales: number
+    revenue: number
+    timeseries?: Array<{ date: string; clicks: number; leads: number; sales: number; revenue: number }>
+}
+
+interface BreakdownItem {
+    name: string
+    clicks: number
+    flag?: string
+}
+
+const kpiFetcher = (url: string) => fetch(url).then(r => r.json()).then(d => d.data?.[0] || { clicks: 0, leads: 0, sales: 0, revenue: 0 })
+const breakdownFetcher = (url: string) => fetch(url).then(r => r.json()).then(d => d.data || [])
+
+function bucketTimeseriesData(data: KPIData['timeseries'], maxBuckets: number) {
+    if (!data || data.length <= maxBuckets) return data || []
+    const bucketSize = Math.ceil(data.length / maxBuckets)
+    const buckets = []
+    for (let i = 0; i < data.length; i += bucketSize) {
+        const slice = data.slice(i, i + bucketSize)
+        const label = slice.length === 1
+            ? slice[0].date
+            : `${slice[0].date.slice(5)} - ${slice[slice.length - 1].date.slice(5)}`
+        buckets.push({
+            date: label,
+            clicks: slice.reduce((s, d) => s + d.clicks, 0),
+            leads: slice.reduce((s, d) => s + d.leads, 0),
+            sales: slice.reduce((s, d) => s + d.sales, 0),
+            revenue: slice.reduce((s, d) => s + d.revenue, 0),
+        })
+    }
+    return buckets
+}
+
 export default function LinkDetailPage() {
     const t = useTranslations('marketing')
     const router = useRouter()
@@ -45,6 +87,8 @@ export default function LinkDetailPage() {
     const [loading, setLoading] = useState(true)
     const [copied, setCopied] = useState(false)
     const [editingField, setEditingField] = useState<string | null>(null)
+    const [selectedDays, setSelectedDays] = useState(30)
+    const [activeEventTypes, setActiveEventTypes] = useState<Set<string>>(new Set(['clicks', 'leads', 'sales']))
 
     useEffect(() => {
         getMarketingLink(linkId).then(res => {
@@ -54,6 +98,37 @@ export default function LinkDetailPage() {
             setLoading(false)
         })
     }, [linkId])
+
+    // Analytics data
+    const dateFrom = format(subDays(new Date(), selectedDays), 'yyyy-MM-dd')
+    const dateTo = format(new Date(), 'yyyy-MM-dd')
+
+    const { data: kpi, isValidating } = useSWR<KPIData>(
+        link ? `/api/stats/kpi?link_id=${linkId}&date_from=${dateFrom}&date_to=${dateTo}` : null,
+        kpiFetcher,
+        { revalidateOnFocus: false }
+    )
+    const { data: countriesData } = useSWR<BreakdownItem[]>(
+        link ? `/api/stats/breakdown?link_id=${linkId}&dimension=countries` : null,
+        breakdownFetcher,
+        { revalidateOnFocus: false }
+    )
+    const { data: devicesData } = useSWR<BreakdownItem[]>(
+        link ? `/api/stats/breakdown?link_id=${linkId}&dimension=devices` : null,
+        breakdownFetcher,
+        { revalidateOnFocus: false }
+    )
+
+    const kpiData = kpi || { clicks: 0, leads: 0, sales: 0, revenue: 0 }
+    const displayTimeseries = useMemo(() => bucketTimeseriesData(kpi?.timeseries, 20), [kpi?.timeseries])
+
+    const toggleEventType = useCallback((type: 'clicks' | 'leads' | 'sales') => {
+        setActiveEventTypes(prev => {
+            if (prev.size === 3) return new Set([type])
+            if (prev.size === 1 && prev.has(type)) return new Set(['clicks', 'leads', 'sales'])
+            return new Set([type])
+        })
+    }, [])
 
     const handleCopy = async () => {
         if (!link) return
@@ -102,6 +177,7 @@ export default function LinkDetailPage() {
                     <div className="h-8 w-48 bg-gray-200 rounded" />
                     <div className="h-4 w-64 bg-gray-100 rounded" />
                 </div>
+                <div className="h-64 bg-gray-100 rounded-2xl animate-pulse" />
             </div>
         )
     }
@@ -134,8 +210,18 @@ export default function LinkDetailPage() {
         { key: 'utm_content', value: link.utm_content },
     ].filter(u => u.value)
 
+    const countries = countriesData || []
+    const devices = devicesData || []
+    const maxCountry = Math.max(...countries.map(c => c.clicks), 1)
+    const maxDevice = Math.max(...devices.map(d => d.clicks), 1)
+
     return (
-        <div className="space-y-6 max-w-4xl">
+        <motion.div
+            className="space-y-6 max-w-4xl"
+            initial="hidden"
+            animate="visible"
+            variants={staggerContainer}
+        >
             {/* Back */}
             <button
                 onClick={() => router.push('/dashboard/links')}
@@ -146,14 +232,14 @@ export default function LinkDetailPage() {
             </button>
 
             {/* Header Card */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <motion.div variants={fadeInUp} transition={springGentle} className="bg-white rounded-xl border border-gray-200 p-6">
                 <div className="flex items-start justify-between">
                     <div className="flex items-center gap-4">
                         <div className={`w-12 h-12 rounded-xl ${channelCfg.color} flex items-center justify-center`}>
                             <ExternalLink className={`w-5 h-5 ${channelCfg.textColor}`} />
                         </div>
                         <div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                                 <h1 className="text-xl font-bold text-gray-900">/{link.slug}</h1>
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${channelCfg.color} ${channelCfg.textColor}`}>
                                     {channelCfg.label}
@@ -186,6 +272,7 @@ export default function LinkDetailPage() {
                             <p className="text-sm text-gray-400 mt-0.5 truncate max-w-lg">{link.original_url}</p>
                             <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
                                 <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {createdDate}</span>
+                                <span className="flex items-center gap-1"><Link2 className="w-3 h-3" /> {link.short_url}</span>
                             </div>
                         </div>
                     </div>
@@ -206,17 +293,86 @@ export default function LinkDetailPage() {
                         </button>
                     </div>
                 </div>
-            </div>
+            </motion.div>
 
-            {/* Clicks */}
-            <div className="inline-flex items-center gap-2 bg-white rounded-xl border border-gray-200 px-5 py-3">
-                <MousePointerClick className="w-4 h-4 text-blue-500" />
-                <span className="text-sm text-gray-500 font-medium">{t('detail.totalClicks')}</span>
-                <span className="text-lg font-bold text-gray-900 tabular-nums ml-1">{link.clicks.toLocaleString()}</span>
-            </div>
+            {/* Analytics Funnel */}
+            <motion.div variants={fadeInUp} transition={springGentle}>
+                <AnalyticsChart
+                    clicks={kpiData.clicks}
+                    leads={kpiData.leads}
+                    sales={kpiData.sales}
+                    revenue={kpiData.revenue}
+                    timeseries={displayTimeseries}
+                    activeEventTypes={activeEventTypes}
+                    onEventTypeToggle={toggleEventType}
+                    selectedDays={selectedDays}
+                    onRangeChange={setSelectedDays}
+                    loadingTimeseries={isValidating}
+                />
+            </motion.div>
+
+            {/* Breakdown Cards */}
+            <motion.div variants={fadeInUp} transition={springGentle} className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {/* Countries */}
+                <div className="bg-white/70 backdrop-blur-sm border border-gray-200/60 rounded-2xl overflow-hidden shadow-sm">
+                    <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+                        <Globe className="w-4 h-4 text-gray-400" />
+                        <h3 className="text-sm font-semibold text-gray-700">Pays</h3>
+                        <span className="ml-auto text-[11px] text-gray-400 font-medium uppercase">Clicks</span>
+                    </div>
+                    <div className="p-4 space-y-2.5">
+                        {countries.length === 0 ? (
+                            <p className="text-sm text-gray-400 text-center py-4">Aucune donnee</p>
+                        ) : countries.map((item) => (
+                            <div key={item.name}>
+                                <div className="flex items-center justify-between mb-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-base leading-none">{item.flag}</span>
+                                        <span className="text-[13px] font-medium text-gray-700">{item.name}</span>
+                                    </div>
+                                    <span className="text-[13px] font-semibold text-gray-900 tabular-nums">{item.clicks.toLocaleString()}</span>
+                                </div>
+                                <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full rounded-full bg-gray-300 transition-all duration-700 ease-out"
+                                        style={{ width: `${Math.max((item.clicks / maxCountry) * 100, 2)}%` }}
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Devices */}
+                <div className="bg-white/70 backdrop-blur-sm border border-gray-200/60 rounded-2xl overflow-hidden shadow-sm">
+                    <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+                        <Monitor className="w-4 h-4 text-gray-400" />
+                        <h3 className="text-sm font-semibold text-gray-700">Appareils</h3>
+                        <span className="ml-auto text-[11px] text-gray-400 font-medium uppercase">Clicks</span>
+                    </div>
+                    <div className="p-4 space-y-2.5">
+                        {devices.length === 0 ? (
+                            <p className="text-sm text-gray-400 text-center py-4">Aucune donnee</p>
+                        ) : devices.map((item) => (
+                            <div key={item.name}>
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="text-[13px] font-medium text-gray-700">{item.name}</span>
+                                    <span className="text-[13px] font-semibold text-gray-900 tabular-nums">{item.clicks.toLocaleString()}</span>
+                                </div>
+                                <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full rounded-full bg-gray-300 transition-all duration-700 ease-out"
+                                        style={{ width: `${Math.max((item.clicks / maxDevice) * 100, 2)}%` }}
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </motion.div>
 
             {/* Editable Properties */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <motion.div variants={fadeInUp} transition={springGentle} className="bg-white rounded-xl border border-gray-200 p-6">
                 <h2 className="text-base font-semibold text-gray-900 mb-4">{t('detail.properties')}</h2>
                 <div className="space-y-3">
                     {/* Campaign */}
@@ -328,11 +484,11 @@ export default function LinkDetailPage() {
                         )}
                     </div>
                 </div>
-            </div>
+            </motion.div>
 
             {/* UTM Parameters */}
             {utmEntries.length > 0 && (
-                <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <motion.div variants={fadeInUp} transition={springGentle} className="bg-white rounded-xl border border-gray-200 p-6">
                     <h2 className="text-base font-semibold text-gray-900 mb-4">{t('detail.utmParameters')}</h2>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {utmEntries.map(u => (
@@ -342,11 +498,11 @@ export default function LinkDetailPage() {
                             </div>
                         ))}
                     </div>
-                </div>
+                </motion.div>
             )}
 
             {/* Short URL */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <motion.div variants={fadeInUp} transition={springGentle} className="bg-white rounded-xl border border-gray-200 p-6">
                 <h2 className="text-base font-semibold text-gray-900 mb-3">{t('detail.shortUrl')}</h2>
                 <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-3">
                     <Link2 className="w-4 h-4 text-gray-500 flex-shrink-0" />
@@ -358,7 +514,7 @@ export default function LinkDetailPage() {
                         {copied ? t('detail.copied') : t('links.copy')}
                     </button>
                 </div>
-            </div>
-        </div>
+            </motion.div>
+        </motion.div>
     )
 }

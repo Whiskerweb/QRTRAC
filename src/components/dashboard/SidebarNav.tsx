@@ -3,7 +3,7 @@
 import {
     Link2, Megaphone, BarChart3,
     ChevronLeft, LogOut, QrCode,
-    Settings, ExternalLink, Menu, X
+    Settings, ExternalLink, Menu, X, Code
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -143,6 +143,19 @@ export function SidebarNav({ displayName, email }: SidebarNavProps) {
                     >
                         <Settings className={`w-[18px] h-[18px] flex-shrink-0 ${pathname === '/dashboard/settings' ? 'text-gray-700' : 'text-gray-400 group-hover:text-gray-600'}`} strokeWidth={1.8} />
                         {!collapsed && <span>{t('settings')}</span>}
+                    </MotionLink>
+                    <MotionLink
+                        href="/dashboard/integration"
+                        title={collapsed ? 'Integration' : undefined}
+                        whileTap={{ scale: 0.97 }}
+                        transition={springSnappy}
+                        className={`flex items-center gap-3 rounded-xl transition-all duration-150 text-[13px] group mt-0.5 ${collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2'} ${pathname === '/dashboard/integration'
+                            ? 'bg-gray-100 text-gray-900 font-medium'
+                            : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                            }`}
+                    >
+                        <Code className={`w-[18px] h-[18px] flex-shrink-0 ${pathname === '/dashboard/integration' ? 'text-gray-700' : 'text-gray-400 group-hover:text-gray-600'}`} strokeWidth={1.8} />
+                        {!collapsed && <span>Integration</span>}
                     </MotionLink>
                 </div>
             </nav>

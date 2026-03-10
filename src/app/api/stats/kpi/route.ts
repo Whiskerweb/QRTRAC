@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const dateFromParam = searchParams.get('date_from')
     const dateToParam = searchParams.get('date_to')
+    const linkId = searchParams.get('link_id')
 
     const now = new Date()
     const dateTo = dateToParam ? new Date(dateToParam) : now
@@ -30,9 +31,22 @@ export async function GET(request: NextRequest) {
 
     const daysDiff = Math.max(1, Math.ceil((dateTo.getTime() - dateFrom.getTime()) / (1000 * 60 * 60 * 24)))
 
+    // Scale factor: individual link gets ~15% of workspace total
+    const linkScale = linkId ? 0.15 : 1
+
+    // Hash link_id for seed offset
+    let linkSeedOffset = 0
+    if (linkId) {
+        for (let i = 0; i < linkId.length; i++) {
+            linkSeedOffset = ((linkSeedOffset << 5) - linkSeedOffset) + linkId.charCodeAt(i)
+            linkSeedOffset |= 0
+        }
+        linkSeedOffset = Math.abs(linkSeedOffset) % 10000
+    }
+
     // Generate deterministic timeseries based on date
     const timeseries = []
-    const seed = dateFrom.getFullYear() * 10000 + (dateFrom.getMonth() + 1) * 100 + dateFrom.getDate()
+    const seed = dateFrom.getFullYear() * 10000 + (dateFrom.getMonth() + 1) * 100 + dateFrom.getDate() + linkSeedOffset
     const rand = seededRandom(seed)
 
     for (let i = 0; i < daysDiff; i++) {
@@ -46,7 +60,7 @@ export async function GET(request: NextRequest) {
         // Slight upward trend over time
         const trendMultiplier = 1 + (i / daysDiff) * 0.3
 
-        const baseClicks = Math.floor((rand() * 80 + 40) * weekdayMultiplier * trendMultiplier)
+        const baseClicks = Math.floor((rand() * 80 + 40) * weekdayMultiplier * trendMultiplier * linkScale)
         const baseLeads = Math.floor(baseClicks * (rand() * 0.15 + 0.08))
         const baseSales = Math.floor(baseClicks * (rand() * 0.06 + 0.02))
         const baseRevenue = baseSales * Math.floor(rand() * 4500 + 1500)

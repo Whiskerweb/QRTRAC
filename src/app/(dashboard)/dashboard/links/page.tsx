@@ -7,7 +7,7 @@ import { motion } from 'framer-motion'
 import { fadeInUp, staggerContainer, springGentle } from '@/lib/animations'
 import {
     Plus, Search, Copy, Trash2,
-    ExternalLink, Link2, Check, MousePointerClick,
+    ExternalLink, Link2, Check, MousePointerClick, UserPlus, CreditCard,
     ChevronDown, Tag, X, Pencil, Folder, Menu
 } from 'lucide-react'
 import { getMarketingLinks, getMarketingOverview, deleteMarketingLink, getMarketingTags, createMarketingTag, updateMarketingTag, deleteMarketingTag, setLinkTags } from '@/app/actions/marketing-links'
@@ -19,6 +19,22 @@ import { CreateLinkModal } from '@/components/marketing/CreateLinkModal'
 import { FolderSidebar } from '@/components/marketing/FolderSidebar'
 import { CampaignManager } from '@/components/marketing/CampaignManager'
 import { BulkActionBar } from '@/components/marketing/BulkActionBar'
+
+/** Deterministic mock leads/sales from link ID + clicks */
+function getMockLeadsSales(linkId: string, clicks: number) {
+    let hash = 0
+    for (let i = 0; i < linkId.length; i++) {
+        hash = ((hash << 5) - hash) + linkId.charCodeAt(i)
+        hash |= 0
+    }
+    const seed = Math.abs(hash)
+    const leadRate = 0.08 + (seed % 100) / 1000
+    const saleRate = 0.02 + (seed % 50) / 1000
+    return {
+        leads: Math.floor(clicks * leadRate),
+        sales: Math.floor(clicks * saleRate),
+    }
+}
 
 interface MarketingTagData {
     id: string
@@ -702,11 +718,26 @@ export default function LinksPage() {
                                         <p className="text-xs text-gray-400 truncate mt-0.5">{link.original_url}</p>
                                     </div>
 
-                                    {/* Clicks */}
-                                    <div className="flex items-center gap-1.5 flex-shrink-0 mr-2">
-                                        <MousePointerClick className="w-3.5 h-3.5 text-gray-400" />
-                                        <span className="text-sm font-semibold text-gray-700 tabular-nums">{link.clicks.toLocaleString()}</span>
-                                    </div>
+                                    {/* Stats: Clicks, Leads, Sales */}
+                                    {(() => {
+                                        const mock = getMockLeadsSales(link.id, link.clicks)
+                                        return (
+                                            <div className="flex items-center gap-3 flex-shrink-0 mr-2">
+                                                <div className="flex items-center gap-1" title="Clicks">
+                                                    <MousePointerClick className="w-3 h-3 text-gray-400" />
+                                                    <span className="text-xs font-semibold text-gray-600 tabular-nums">{link.clicks.toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1" title="Leads">
+                                                    <UserPlus className="w-3 h-3 text-blue-400" />
+                                                    <span className="text-xs font-semibold text-blue-600 tabular-nums">{mock.leads}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1" title="Sales">
+                                                    <CreditCard className="w-3 h-3 text-green-400" />
+                                                    <span className="text-xs font-semibold text-green-600 tabular-nums">{mock.sales}</span>
+                                                </div>
+                                            </div>
+                                        )
+                                    })()}
 
                                     {/* Actions */}
                                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">

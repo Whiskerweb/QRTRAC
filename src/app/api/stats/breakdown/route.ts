@@ -60,13 +60,31 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const dimension = searchParams.get('dimension') || 'countries'
     const source = searchParams.get('source')
+    const linkId = searchParams.get('link_id')
 
-    // Scale down for marketing source
-    const scale = source === 'marketing' ? 0.3 : 1
-    const data = (MOCK_DATA[dimension] || []).map(item => ({
+    // Scale down based on context
+    let scale = source === 'marketing' ? 0.3 : 1
+    if (linkId) scale *= 0.15
+
+    // Hash link_id for shuffle offset
+    let linkHash = 0
+    if (linkId) {
+        for (let i = 0; i < linkId.length; i++) {
+            linkHash = ((linkHash << 5) - linkHash) + linkId.charCodeAt(i)
+            linkHash |= 0
+        }
+        linkHash = Math.abs(linkHash)
+    }
+
+    let data = (MOCK_DATA[dimension] || []).map((item, idx) => ({
         ...item,
-        clicks: Math.floor((item.clicks as number) * scale),
+        clicks: Math.max(1, Math.floor((item.clicks as number) * scale * (linkId ? (0.5 + ((linkHash + idx * 37) % 100) / 100) : 1))),
     }))
+
+    // For individual links, return fewer items
+    if (linkId) {
+        data = data.slice(0, 5)
+    }
 
     return NextResponse.json({
         data,
