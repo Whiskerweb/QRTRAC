@@ -49,6 +49,15 @@ const MOCK_DATA: Record<string, Array<Record<string, unknown>>> = {
     ],
 }
 
+function hashString(str: string): number {
+    let hash = 0
+    for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) - hash) + str.charCodeAt(i)
+        hash |= 0
+    }
+    return Math.abs(hash)
+}
+
 export async function GET(request: NextRequest) {
     // Auth check
     const supabase = await createClient()
@@ -61,29 +70,43 @@ export async function GET(request: NextRequest) {
     const dimension = searchParams.get('dimension') || 'countries'
     const source = searchParams.get('source')
     const linkId = searchParams.get('link_id')
+    const campaignId = searchParams.get('campaign_id')
+    const folderId = searchParams.get('folder_id')
+    const channel = searchParams.get('channel')
 
-    // Scale down based on context
+    // Determine scale and hash based on scope
     let scale = source === 'marketing' ? 0.3 : 1
-    if (linkId) scale *= 0.15
+    let scopeHash = 0
+    let isScoped = false
 
-    // Hash link_id for shuffle offset
-    let linkHash = 0
     if (linkId) {
-        for (let i = 0; i < linkId.length; i++) {
-            linkHash = ((linkHash << 5) - linkHash) + linkId.charCodeAt(i)
-            linkHash |= 0
-        }
-        linkHash = Math.abs(linkHash)
+        scale *= 0.15
+        scopeHash = hashString(linkId)
+        isScoped = true
+    } else if (campaignId) {
+        scale *= 0.5
+        scopeHash = hashString(campaignId)
+        isScoped = true
+    } else if (folderId) {
+        scale *= 0.4
+        scopeHash = hashString(folderId)
+        isScoped = true
+    } else if (channel) {
+        scale *= 0.4
+        scopeHash = hashString(channel)
+        isScoped = true
     }
 
     let data = (MOCK_DATA[dimension] || []).map((item, idx) => ({
         ...item,
-        clicks: Math.max(1, Math.floor((item.clicks as number) * scale * (linkId ? (0.5 + ((linkHash + idx * 37) % 100) / 100) : 1))),
+        clicks: Math.max(1, Math.floor((item.clicks as number) * scale * (isScoped ? (0.5 + ((scopeHash + idx * 37) % 100) / 100) : 1))),
     }))
 
-    // For individual links, return fewer items
+    // For scoped views (not workspace-wide), return fewer items
     if (linkId) {
         data = data.slice(0, 5)
+    } else if (isScoped) {
+        data = data.slice(0, 7)
     }
 
     return NextResponse.json({

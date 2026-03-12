@@ -10,7 +10,7 @@ import { subDays, format } from 'date-fns'
 import {
     ArrowLeft, Copy, ExternalLink,
     Check, Link2, Calendar, Tag, Trash2, Pencil, Folder,
-    Globe, Monitor
+    Globe, Monitor, BarChart3
 } from 'lucide-react'
 import { getMarketingLink, deleteMarketingLink, updateMarketingLink } from '@/app/actions/marketing-links'
 import { toast } from 'sonner'
@@ -55,6 +55,8 @@ interface BreakdownItem {
     flag?: string
 }
 
+type StatsScope = 'link' | 'campaign' | 'folder' | 'channel' | 'workspace'
+
 const kpiFetcher = (url: string) => fetch(url).then(r => r.json()).then(d => d.data?.[0] || { clicks: 0, leads: 0, sales: 0, revenue: 0 })
 const breakdownFetcher = (url: string) => fetch(url).then(r => r.json()).then(d => d.data || [])
 
@@ -89,6 +91,7 @@ export default function LinkDetailPage() {
     const [copied, setCopied] = useState(false)
     const [editingField, setEditingField] = useState<string | null>(null)
     const [selectedDays, setSelectedDays] = useState(30)
+    const [statsScope, setStatsScope] = useState<StatsScope>('link')
     const [activeEventTypes, setActiveEventTypes] = useState<Set<string>>(new Set(['clicks', 'leads', 'sales']))
 
     useEffect(() => {
@@ -103,22 +106,36 @@ export default function LinkDetailPage() {
         })
     }, [linkId])
 
-    // Analytics data
+    // Analytics data — build query params based on scope
     const dateFrom = format(subDays(new Date(), selectedDays), 'yyyy-MM-dd')
     const dateTo = format(new Date(), 'yyyy-MM-dd')
 
+    const statsFilter = useMemo(() => {
+        if (!link) return ''
+        switch (statsScope) {
+            case 'campaign': return `campaign_id=${link.campaign_id}`
+            case 'folder': return `folder_id=${link.folder_id}`
+            case 'channel': return `channel=${link.channel}`
+            case 'workspace': return ''
+            default: return `link_id=${linkId}`
+        }
+    }, [statsScope, link, linkId])
+
+    const kpiUrl = link ? `/api/stats/kpi?${statsFilter}${statsFilter ? '&' : ''}date_from=${dateFrom}&date_to=${dateTo}` : null
+    const breakdownBase = link ? `/api/stats/breakdown?${statsFilter}${statsFilter ? '&' : ''}` : null
+
     const { data: kpi, isValidating } = useSWR<KPIData>(
-        link ? `/api/stats/kpi?link_id=${linkId}&date_from=${dateFrom}&date_to=${dateTo}` : null,
+        kpiUrl,
         kpiFetcher,
         { revalidateOnFocus: false }
     )
     const { data: countriesData } = useSWR<BreakdownItem[]>(
-        link ? `/api/stats/breakdown?link_id=${linkId}&dimension=countries` : null,
+        breakdownBase ? `${breakdownBase}dimension=countries` : null,
         breakdownFetcher,
         { revalidateOnFocus: false }
     )
     const { data: devicesData } = useSWR<BreakdownItem[]>(
-        link ? `/api/stats/breakdown?link_id=${linkId}&dimension=devices` : null,
+        breakdownBase ? `${breakdownBase}dimension=devices` : null,
         breakdownFetcher,
         { revalidateOnFocus: false }
     )
@@ -299,6 +316,77 @@ export default function LinkDetailPage() {
                             <Trash2 className="w-4 h-4" />
                         </button>
                     </div>
+                </div>
+            </motion.div>
+
+            {/* Stats Scope Selector */}
+            <motion.div variants={fadeInUp} transition={springGentle}>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-1 text-xs text-gray-400 mr-1">
+                        <BarChart3 className="w-3.5 h-3.5" />
+                        <span>Stats :</span>
+                    </div>
+                    <button
+                        onClick={() => setStatsScope('link')}
+                        className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all ${
+                            statsScope === 'link'
+                                ? 'bg-gray-900 text-white shadow-sm'
+                                : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-700'
+                        }`}
+                    >
+                        Ce lien
+                    </button>
+                    {link.campaign_id && link.Campaign && (
+                        <button
+                            onClick={() => setStatsScope('campaign')}
+                            className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all flex items-center gap-1.5 ${
+                                statsScope === 'campaign'
+                                    ? 'bg-gray-900 text-white shadow-sm'
+                                    : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-700'
+                            }`}
+                        >
+                            <span
+                                className="w-2 h-2 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: statsScope === 'campaign' ? 'white' : (link.Campaign.color || '#6B7280') }}
+                            />
+                            {link.Campaign.name}
+                        </button>
+                    )}
+                    {link.folder_id && link.Folder && (
+                        <button
+                            onClick={() => setStatsScope('folder')}
+                            className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all flex items-center gap-1.5 ${
+                                statsScope === 'folder'
+                                    ? 'bg-gray-900 text-white shadow-sm'
+                                    : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-700'
+                            }`}
+                        >
+                            <Folder className="w-3 h-3" />
+                            {link.Folder.name}
+                        </button>
+                    )}
+                    {link.channel && (
+                        <button
+                            onClick={() => setStatsScope('channel')}
+                            className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all ${
+                                statsScope === 'channel'
+                                    ? 'bg-gray-900 text-white shadow-sm'
+                                    : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-700'
+                            }`}
+                        >
+                            {getChannelConfig(link.channel).label}
+                        </button>
+                    )}
+                    <button
+                        onClick={() => setStatsScope('workspace')}
+                        className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all ${
+                            statsScope === 'workspace'
+                                ? 'bg-gray-900 text-white shadow-sm'
+                                : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-700'
+                        }`}
+                    >
+                        Tous les liens
+                    </button>
                 </div>
             </motion.div>
 

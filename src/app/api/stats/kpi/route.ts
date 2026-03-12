@@ -12,6 +12,15 @@ function seededRandom(seed: number): () => number {
     }
 }
 
+function hashString(str: string): number {
+    let hash = 0
+    for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) - hash) + str.charCodeAt(i)
+        hash |= 0
+    }
+    return Math.abs(hash) % 10000
+}
+
 export async function GET(request: NextRequest) {
     // Auth check
     const supabase = await createClient()
@@ -24,6 +33,9 @@ export async function GET(request: NextRequest) {
     const dateFromParam = searchParams.get('date_from')
     const dateToParam = searchParams.get('date_to')
     const linkId = searchParams.get('link_id')
+    const campaignId = searchParams.get('campaign_id')
+    const folderId = searchParams.get('folder_id')
+    const channel = searchParams.get('channel')
 
     const now = new Date()
     const dateTo = dateToParam ? new Date(dateToParam) : now
@@ -31,22 +43,27 @@ export async function GET(request: NextRequest) {
 
     const daysDiff = Math.max(1, Math.ceil((dateTo.getTime() - dateFrom.getTime()) / (1000 * 60 * 60 * 24)))
 
-    // Scale factor: individual link gets ~15% of workspace total
-    const linkScale = linkId ? 0.15 : 1
+    // Determine scale and seed offset based on scope
+    let linkScale = 1
+    let seedOffset = 0
 
-    // Hash link_id for seed offset
-    let linkSeedOffset = 0
     if (linkId) {
-        for (let i = 0; i < linkId.length; i++) {
-            linkSeedOffset = ((linkSeedOffset << 5) - linkSeedOffset) + linkId.charCodeAt(i)
-            linkSeedOffset |= 0
-        }
-        linkSeedOffset = Math.abs(linkSeedOffset) % 10000
+        linkScale = 0.15
+        seedOffset = hashString(linkId)
+    } else if (campaignId) {
+        linkScale = 0.5
+        seedOffset = hashString(campaignId)
+    } else if (folderId) {
+        linkScale = 0.4
+        seedOffset = hashString(folderId)
+    } else if (channel) {
+        linkScale = 0.4
+        seedOffset = hashString(channel)
     }
 
     // Generate deterministic timeseries based on date
     const timeseries = []
-    const seed = dateFrom.getFullYear() * 10000 + (dateFrom.getMonth() + 1) * 100 + dateFrom.getDate() + linkSeedOffset
+    const seed = dateFrom.getFullYear() * 10000 + (dateFrom.getMonth() + 1) * 100 + dateFrom.getDate() + seedOffset
     const rand = seededRandom(seed)
 
     for (let i = 0; i < daysDiff; i++) {
