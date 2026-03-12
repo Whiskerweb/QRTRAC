@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTranslations } from 'next-intl'
+import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import {
     X, Link2, Loader2, Check, Copy, Globe,
     Shuffle, ChevronDown, ExternalLink,
-    Image as ImageIcon, Upload, Trash2,
-    Eye, Twitter, Linkedin, Facebook, Tag, Plus
+    Upload, Trash2,
+    Eye, Twitter, Linkedin, Facebook, Tag, Plus, Palette
 } from 'lucide-react'
 import { createMarketingLink, getMarketingTags, createMarketingTag } from '@/app/actions/marketing-links'
 import { PREDEFINED_CHANNELS } from '@/lib/marketing/channels'
@@ -14,6 +16,13 @@ import { TAG_COLORS, getTagColor } from '@/lib/marketing/tags'
 import { CampaignSelect } from '@/components/marketing/CampaignSelect'
 import { FolderSelect } from '@/components/marketing/FolderSelect'
 import { nanoid } from 'nanoid'
+import { toast } from 'sonner'
+import type { QREditorState } from '@/types/qr'
+
+const QRPreview = dynamic(
+    () => import('@/components/editor/QRPreview').then(m => ({ default: m.QRPreview })),
+    { ssr: false, loading: () => <div className="w-[180px] h-[180px] bg-gray-100 rounded-xl animate-pulse" /> }
+)
 
 interface TagOption {
     id: string
@@ -29,11 +38,13 @@ interface CreateLinkModalProps {
 
 export function CreateLinkModal({ isOpen, onClose, onSuccess }: CreateLinkModalProps) {
     const t = useTranslations('marketing')
+    const router = useRouter()
 
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [result, setResult] = useState<{ slug: string; short_url: string } | null>(null)
     const [copied, setCopied] = useState(false)
+    const [uploadingOg, setUploadingOg] = useState(false)
 
     const [url, setUrl] = useState('')
     const [slug, setSlug] = useState('')
@@ -61,6 +72,7 @@ export function CreateLinkModal({ isOpen, onClose, onSuccess }: CreateLinkModalP
     const [inlineTagColor, setInlineTagColor] = useState(TAG_COLORS[0].hex)
 
     const utmRef = useRef<HTMLDivElement>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
 
     const defaultDomain = typeof window !== 'undefined'
         ? (process.env.NEXT_PUBLIC_TRAAACTION_URL || 'https://traaaction.com').replace(/^https?:\/\//, '')
@@ -107,6 +119,47 @@ export function CreateLinkModal({ isOpen, onClose, onSuccess }: CreateLinkModalP
     if (!isOpen) return null
 
     const handleRandomizeSlug = () => setSlug(nanoid(7))
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        if (!file.type.startsWith('image/')) return
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error('Image trop volumineuse (max 5 Mo)')
+            return
+        }
+        setUploadingOg(true)
+        try {
+            const formData = new FormData()
+            formData.append('file', file)
+            formData.append('type', 'og_image')
+            const res = await fetch('/api/upload', { method: 'POST', body: formData })
+            const data = await res.json()
+            if (data.success) {
+                setOgImage(data.url)
+            } else {
+                toast.error(data.error || 'Upload failed')
+            }
+        } catch {
+            toast.error('Upload failed')
+        }
+        setUploadingOg(false)
+        e.target.value = ''
+    }
+
+    const qrPreviewState: QREditorState | null = result ? {
+        contentType: 'url',
+        contentData: { url: result.short_url },
+        dotsStyle: { type: 'rounded', color: { type: 'single', color: '#000000' } },
+        cornerSquaresStyle: { type: 'extra-rounded', color: { type: 'single', color: '#000000' } },
+        cornerDotsStyle: { type: 'dot', color: { type: 'single', color: '#000000' } },
+        background: { color: { type: 'single', color: '#ffffff' }, transparent: false },
+        logo: { file: null, url: null, size: 0.2, margin: 5, shape: 'square' },
+        exportConfig: { format: 'png', resolution: 1000 },
+        name: '',
+        errorCorrectionLevel: 'Q',
+        qrSize: 300,
+    } : null
 
     async function handleSubmit() {
         setError('')
@@ -161,10 +214,10 @@ export function CreateLinkModal({ isOpen, onClose, onSuccess }: CreateLinkModalP
 
                 {result ? (
                     <div className="p-8 flex flex-col items-center text-center">
-                        <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6"><Check className="w-8 h-8" /></div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">{t('modal.allSet')}</h3>
-                        <p className="text-gray-500 mb-6">{t('modal.linkReady')}</p>
-                        <div className="w-full bg-gray-50 border border-gray-200 rounded-lg p-4 flex items-center justify-between mb-6">
+                        <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4"><Check className="w-8 h-8" /></div>
+                        <h3 className="text-xl font-bold text-gray-900 mb-1">{t('modal.allSet')}</h3>
+                        <p className="text-gray-500 mb-5">{t('modal.linkReady')}</p>
+                        <div className="w-full bg-gray-50 border border-gray-200 rounded-lg p-4 flex items-center justify-between mb-5">
                             <div className="flex items-center gap-3 overflow-hidden">
                                 <div className="p-2 bg-white rounded-lg border border-gray-100 shadow-sm"><Globe className="w-4 h-4 text-blue-500" /></div>
                                 <code className="text-gray-900 font-medium truncate text-sm">{result.short_url.replace(/^https?:\/\//, '')}</code>
@@ -173,6 +226,27 @@ export function CreateLinkModal({ isOpen, onClose, onSuccess }: CreateLinkModalP
                                 {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                             </button>
                         </div>
+
+                        {/* QR Code Preview */}
+                        {qrPreviewState && (
+                            <div className="mb-5">
+                                <div className="bg-white rounded-xl p-4 shadow-lg border border-gray-100 inline-block">
+                                    <QRPreview state={qrPreviewState} size={180} />
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        const encoded = encodeURIComponent(result.short_url)
+                                        router.push(`/dashboard/editor?url=${encoded}`)
+                                        onClose()
+                                    }}
+                                    className="mt-3 flex items-center gap-2 mx-auto px-4 py-2 text-sm font-medium text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-lg transition-colors"
+                                >
+                                    <Palette className="w-4 h-4" />
+                                    {t('modal.customizeQr')}
+                                </button>
+                            </div>
+                        )}
+
                         <div className="flex gap-3 w-full">
                             <button onClick={handleClose} className="flex-1 py-2 px-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-medium rounded-lg transition-colors text-sm">{t('modal.close')}</button>
                             <button onClick={() => { setResult(null); setUrl(''); setSlug(''); setChannel(''); setCampaign(''); setError('') }} className="flex-1 py-2 px-4 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-lg transition-colors text-sm">{t('modal.createAnother')}</button>
@@ -269,11 +343,24 @@ export function CreateLinkModal({ isOpen, onClose, onSuccess }: CreateLinkModalP
                                                 <button type="button" onClick={() => setOgImage('')} className="absolute top-2 right-2 p-1.5 bg-white/90 hover:bg-white rounded-md shadow-sm transition-colors"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>
                                             </div>
                                         ) : (
-                                            <div className="flex flex-col items-center justify-center w-full h-[140px] border-b border-dashed border-gray-200">
-                                                <Upload className="w-5 h-5 text-gray-300 mb-1" />
-                                                <span className="text-xs text-gray-400">{t('create.ogImageUpload')}</span>
-                                                <span className="text-[10px] text-gray-300 mt-0.5">{t('create.ogImageHint')}</span>
-                                            </div>
+                                            <label className="flex flex-col items-center justify-center w-full h-[140px] border-b border-dashed border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer">
+                                                {uploadingOg ? (
+                                                    <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+                                                ) : (
+                                                    <>
+                                                        <Upload className="w-5 h-5 text-gray-300 mb-1" />
+                                                        <span className="text-xs text-gray-400">{t('create.ogImageUpload')}</span>
+                                                        <span className="text-[10px] text-gray-300 mt-0.5">{t('create.ogImageHint')}</span>
+                                                    </>
+                                                )}
+                                                <input
+                                                    ref={fileInputRef}
+                                                    type="file"
+                                                    accept="image/jpeg,image/png,image/webp"
+                                                    className="hidden"
+                                                    onChange={handleImageUpload}
+                                                />
+                                            </label>
                                         )}
                                         <div className="px-3 pt-3"><input type="text" value={ogTitle} onChange={(e) => setOgTitle(e.target.value)} placeholder="Add a title..." className="w-full text-sm font-semibold text-gray-900 placeholder:text-gray-300 focus:outline-none bg-transparent" /></div>
                                         <div className="px-3 pt-1 pb-2"><textarea value={ogDescription} onChange={(e) => setOgDescription(e.target.value)} placeholder="Add a description..." rows={2} className="w-full text-xs text-gray-500 placeholder:text-gray-300 focus:outline-none bg-transparent resize-none" /></div>

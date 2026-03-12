@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUserWorkspace } from '@/lib/workspace'
 import type { CampaignStatus } from '@/types/marketing'
 
@@ -18,7 +18,7 @@ export async function createMarketingCampaign(input: CreateCampaignInput) {
     if (!workspace) return { success: false, error: 'Not authenticated' }
     if (!input.name?.trim()) return { success: false, error: 'Name is required' }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const { data: campaign, error } = await supabase.from('MarketingCampaign').insert({
         name: input.name.trim(),
         description: input.description?.trim() || null,
@@ -51,7 +51,7 @@ export async function updateMarketingCampaign(id: string, input: UpdateCampaignI
     const workspace = await getCurrentUserWorkspace()
     if (!workspace) return { success: false, error: 'Not authenticated' }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const { data: campaign } = await supabase.from('MarketingCampaign').select('name, workspace_id').eq('id', id).single()
     if (!campaign || campaign.workspace_id !== workspace.workspaceId) return { success: false, error: 'Campaign not found' }
 
@@ -83,7 +83,7 @@ export async function deleteMarketingCampaign(id: string) {
     const workspace = await getCurrentUserWorkspace()
     if (!workspace) return { success: false, error: 'Not authenticated' }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const { data: campaign } = await supabase.from('MarketingCampaign').select('workspace_id').eq('id', id).single()
     if (!campaign || campaign.workspace_id !== workspace.workspaceId) return { success: false, error: 'Campaign not found' }
 
@@ -98,7 +98,7 @@ export async function getMarketingCampaignList() {
     const workspace = await getCurrentUserWorkspace()
     if (!workspace) return { success: false, error: 'Not authenticated', data: [] }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const { data: campaigns, error: listError } = await supabase
         .from('MarketingCampaign')
         .select('*')
@@ -138,7 +138,7 @@ export async function getMarketingCampaign(id: string) {
     const workspace = await getCurrentUserWorkspace()
     if (!workspace) return { success: false, error: 'Not authenticated' }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const { data: campaign } = await supabase.from('MarketingCampaign').select('*').eq('id', id).single()
     if (!campaign || campaign.workspace_id !== workspace.workspaceId) return { success: false, error: 'Campaign not found' }
 

@@ -65,7 +65,8 @@
             "close": "Close",
             "createAnother": "Create Another",
             "cancel": "Cancel",
-            "customLinkPreview": "Custom Link Preview"
+            "customLinkPreview": "Custom Link Preview",
+            "customizeQr": "Customize QR Code"
         },
         "detail": {
             "notFound": "Link not found",

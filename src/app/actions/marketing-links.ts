@@ -1,13 +1,13 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUserWorkspace } from '@/lib/workspace'
 import { nanoid } from 'nanoid'
 
 const DEFAULT_BASE = process.env.NEXT_PUBLIC_TRAAACTION_URL || 'https://traaaction.com'
 
 async function getShortLinkBase(workspaceId: string): Promise<string> {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const { data: domain } = await supabase
         .from('Domain')
         .select('name')
@@ -55,7 +55,7 @@ export async function createMarketingLink(input: MarketingLinkInput) {
         slug = slug.toLowerCase().replace(/[^a-z0-9-]/g, '')
     }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     // Check uniqueness
     const { data: existing } = await supabase.from('ShortLink').select('id').eq('slug', slug).single()
@@ -162,7 +162,7 @@ export async function getMarketingLinks(filters?: {
     const workspace = await getCurrentUserWorkspace()
     if (!workspace) return { success: false, error: 'Not authenticated', data: [] }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     let query = supabase
         .from('ShortLink')
@@ -276,7 +276,7 @@ export async function getMarketingLink(id: string) {
     const workspace = await getCurrentUserWorkspace()
     if (!workspace) return { success: false, error: 'Not authenticated' }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     const { data: link } = await supabase
         .from('ShortLink')
@@ -326,7 +326,7 @@ export async function updateMarketingLink(id: string, input: Partial<MarketingLi
     const workspace = await getCurrentUserWorkspace()
     if (!workspace) return { success: false, error: 'Not authenticated' }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     const { data: link } = await supabase.from('ShortLink').select('*').eq('id', id).single()
     if (!link || link.workspace_id !== workspace.workspaceId || link.link_type !== 'marketing') {
@@ -393,7 +393,7 @@ export async function deleteMarketingLink(id: string) {
     const workspace = await getCurrentUserWorkspace()
     if (!workspace) return { success: false, error: 'Not authenticated' }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     const { data: link } = await supabase.from('ShortLink').select('slug, workspace_id, link_type').eq('id', id).single()
     if (!link || link.workspace_id !== workspace.workspaceId || link.link_type !== 'marketing') {
@@ -415,7 +415,7 @@ export async function getMarketingOverview() {
     const workspace = await getCurrentUserWorkspace()
     if (!workspace) return { success: false, error: 'Not authenticated' }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     const { data: links } = await supabase
         .from('ShortLink')
@@ -458,7 +458,7 @@ export async function getMarketingChannelStats() {
     const workspace = await getCurrentUserWorkspace()
     if (!workspace) return { success: false, error: 'Not authenticated', data: [] }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     const { data: links } = await supabase
         .from('ShortLink')
@@ -486,7 +486,7 @@ export async function createMarketingTag(name: string, color: string) {
     if (!workspace) return { success: false, error: 'Not authenticated' }
     if (!name.trim()) return { success: false, error: 'Name is required' }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const { data: tag, error } = await supabase.from('MarketingTag').insert({
         name: name.trim(), color, workspace_id: workspace.workspaceId,
     }).select().single()
@@ -500,7 +500,7 @@ export async function updateMarketingTag(id: string, data: { name?: string; colo
     const workspace = await getCurrentUserWorkspace()
     if (!workspace) return { success: false, error: 'Not authenticated' }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const { data: tag } = await supabase.from('MarketingTag').select('workspace_id').eq('id', id).single()
     if (!tag || tag.workspace_id !== workspace.workspaceId) return { success: false, error: 'Tag not found' }
 
@@ -518,7 +518,7 @@ export async function deleteMarketingTag(id: string) {
     const workspace = await getCurrentUserWorkspace()
     if (!workspace) return { success: false, error: 'Not authenticated' }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const { data: tag } = await supabase.from('MarketingTag').select('workspace_id').eq('id', id).single()
     if (!tag || tag.workspace_id !== workspace.workspaceId) return { success: false, error: 'Tag not found' }
 
@@ -532,7 +532,7 @@ export async function getMarketingTags() {
     const workspace = await getCurrentUserWorkspace()
     if (!workspace) return { success: false, error: 'Not authenticated', data: [] }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const { data: tags } = await supabase
         .from('MarketingTag')
         .select('id, name, color')
@@ -563,7 +563,7 @@ export async function setLinkTags(linkId: string, tagIds: string[]) {
     const workspace = await getCurrentUserWorkspace()
     if (!workspace) return { success: false, error: 'Not authenticated' }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const { data: link } = await supabase.from('ShortLink').select('workspace_id').eq('id', linkId).single()
     if (!link || link.workspace_id !== workspace.workspaceId) return { success: false, error: 'Link not found' }
 
@@ -583,7 +583,7 @@ export async function getMarketingCampaigns() {
     const workspace = await getCurrentUserWorkspace()
     if (!workspace) return { success: false, error: 'Not authenticated', data: [] }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const { data: links } = await supabase
         .from('ShortLink')
         .select('campaign, channel, clicks')
@@ -620,7 +620,7 @@ async function validateBulkLinks(linkIds: string[]) {
     const workspace = await getCurrentUserWorkspace()
     if (!workspace) return { error: 'Not authenticated' }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const { data: links } = await supabase
         .from('ShortLink')
         .select('id, slug')

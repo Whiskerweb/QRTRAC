@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUserWorkspace } from '@/lib/workspace'
 
 interface CreateFolderInput {
@@ -14,7 +14,7 @@ export async function createMarketingFolder(input: CreateFolderInput) {
     if (!workspace) return { success: false, error: 'Not authenticated' }
     if (!input.name?.trim()) return { success: false, error: 'Name is required' }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     // Validate max 2 levels
     if (input.parent_id) {
@@ -66,7 +66,7 @@ export async function updateMarketingFolder(id: string, input: { name?: string; 
     const workspace = await getCurrentUserWorkspace()
     if (!workspace) return { success: false, error: 'Not authenticated' }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const { data: folder } = await supabase.from('MarketingFolder').select('workspace_id').eq('id', id).single()
     if (!folder || folder.workspace_id !== workspace.workspaceId) return { success: false, error: 'Folder not found' }
 
@@ -84,7 +84,7 @@ export async function deleteMarketingFolder(id: string) {
     const workspace = await getCurrentUserWorkspace()
     if (!workspace) return { success: false, error: 'Not authenticated' }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const { data: folder } = await supabase.from('MarketingFolder').select('workspace_id').eq('id', id).single()
     if (!folder || folder.workspace_id !== workspace.workspaceId) return { success: false, error: 'Folder not found' }
 
@@ -110,7 +110,7 @@ export async function getMarketingFolderTree() {
     const workspace = await getCurrentUserWorkspace()
     if (!workspace) return { success: false, error: 'Not authenticated', data: [] }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const { data: folders } = await supabase
         .from('MarketingFolder')
         .select('*')

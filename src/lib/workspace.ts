@@ -1,14 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function getCurrentUserWorkspace() {
+    // Auth check via session client (reads cookies)
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) return null
 
-    // Try existing workspace membership (Traaaction startup user)
-    // Use maybeSingle() to avoid 406 error when no rows found
-    const { data: membership, error: memberError } = await supabase
+    // DB query via admin client (bypasses RLS)
+    const admin = createAdminClient()
+    const { data: membership, error: memberError } = await admin
         .from('WorkspaceMember')
         .select('workspace_id')
         .eq('user_id', user.id)
@@ -24,6 +26,5 @@ export async function getCurrentUserWorkspace() {
     }
 
     // Fallback for standalone QR users: use user ID as workspace scope
-    // This allows server actions to work without a formal Workspace record
     return { workspaceId: user.id, userId: user.id }
 }

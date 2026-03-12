@@ -65,7 +65,8 @@
             "close": "Cerrar",
             "createAnother": "Crear otro",
             "cancel": "Cancelar",
-            "customLinkPreview": "Vista previa del enlace"
+            "customLinkPreview": "Vista previa del enlace",
+            "customizeQr": "Personalizar el código QR"
         },
         "detail": {
             "notFound": "Enlace no encontrado",

@@ -21,9 +21,10 @@ import { toast } from 'sonner';
 
 interface QREditorProps {
   qrId?: string;
+  initialUrl?: string;
 }
 
-export function QREditor({ qrId }: QREditorProps) {
+export function QREditor({ qrId, initialUrl }: QREditorProps) {
   const router = useRouter();
   const supabase = createClient();
   const qrInstance = useRef<QRCodeStyling | null>(null);
@@ -31,7 +32,9 @@ export function QREditor({ qrId }: QREditorProps) {
   const [loading, setLoading] = useState(!!qrId);
   const [showFullscreen, setShowFullscreen] = useState(false);
 
-  const { state, update, setContentType, applyTemplate } = useQREditor();
+  const { state, update, setContentType, applyTemplate } = useQREditor(
+    initialUrl ? { contentType: 'url', contentData: { url: initialUrl }, name: 'QR — Link' } : undefined
+  );
 
   // Charger un QR existant
   useEffect(() => {
