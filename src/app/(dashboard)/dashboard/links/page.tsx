@@ -43,7 +43,7 @@ export default function LinksPage() {
     const searchParams = useSearchParams()
     const [links, setLinks] = useState<MarketingLink[]>([])
     const [loading, setLoading] = useState(true)
-    const [loadError, setLoadError] = useState(false)
+    const [loadError, setLoadError] = useState<string | false>(false)
     const [search, setSearch] = useState('')
     const [activeCampaignId, setActiveCampaignId] = useState<string | null>(searchParams.get('campaign_id'))
     const [campaigns, setCampaigns] = useState<CampaignData[]>([])
@@ -84,10 +84,12 @@ export default function LinksPage() {
             if (res.success) {
                 setLinks(res.data as unknown as MarketingLink[])
             } else {
-                setLoadError(true)
+                console.error('[links] getMarketingLinks failed:', res.error)
+                setLoadError(res.error || 'Unknown error')
             }
-        } catch {
-            setLoadError(true)
+        } catch (err) {
+            console.error('[links] loadLinks exception:', err)
+            setLoadError(err instanceof Error ? err.message : 'Exception')
         } finally {
             setLoading(false)
         }
@@ -270,7 +272,10 @@ export default function LinksPage() {
                         <AlertCircle className="w-6 h-6 text-red-400" />
                     </div>
                     <h3 className="text-[15px] font-semibold text-gray-900 mb-1">Erreur de chargement</h3>
-                    <p className="text-[13px] text-gray-500 mb-4">Impossible de charger les liens.</p>
+                    <p className="text-[13px] text-gray-500 mb-1">Impossible de charger les liens.</p>
+                    {typeof loadError === 'string' && (
+                        <p className="text-[11px] text-red-400 mb-4 font-mono">{loadError}</p>
+                    )}
                     <button
                         onClick={() => { setLoading(true); loadLinks() }}
                         className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-[13px] font-medium rounded-xl hover:bg-gray-800 transition-colors"

@@ -159,10 +159,22 @@ export async function getMarketingLinks(filters?: {
     search?: string
     tagIds?: string[]
 }) {
-    const workspace = await getCurrentUserWorkspace()
+    let workspace
+    try {
+        workspace = await getCurrentUserWorkspace()
+    } catch (err) {
+        console.error('[getMarketingLinks] workspace error:', err)
+        return { success: false, error: `Workspace error: ${err instanceof Error ? err.message : String(err)}`, data: [] }
+    }
     if (!workspace) return { success: false, error: 'Not authenticated', data: [] }
 
-    const supabase = createAdminClient()
+    let supabase
+    try {
+        supabase = createAdminClient()
+    } catch (err) {
+        console.error('[getMarketingLinks] admin client error:', err)
+        return { success: false, error: `Admin client error: ${err instanceof Error ? err.message : String(err)}`, data: [] }
+    }
 
     let query = supabase
         .from('ShortLink')
@@ -186,7 +198,10 @@ export async function getMarketingLinks(filters?: {
     }
 
     const { data: links, error } = await query
-    if (error) return { success: false, error: error.message, data: [] }
+    if (error) {
+        console.error('[getMarketingLinks] query error:', error.message, 'workspace:', workspace.workspaceId)
+        return { success: false, error: `Query error: ${error.message}`, data: [] }
+    }
 
     // Fetch tags for these links
     let linksWithTags = links || []
