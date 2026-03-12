@@ -1,120 +1,159 @@
 import { NextResponse, NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getCurrentUserWorkspace } from '@/lib/workspace'
+import { createAdminClient } from '@/lib/supabase/admin'
+import {
+    executeTinybirdSQL,
+    isTinybirdConfigured,
+    sanitizeUUID,
+    sanitizeDateString,
+    buildClicksFilterSQL,
+    COUNTRY_FLAGS,
+} from '@/lib/tinybird'
 
 export const dynamic = 'force-dynamic'
 
-const MOCK_DATA: Record<string, Array<Record<string, unknown>>> = {
-    countries: [
-        { name: 'France', flag: '\u{1F1EB}\u{1F1F7}', clicks: 847 },
-        { name: 'United States', flag: '\u{1F1FA}\u{1F1F8}', clicks: 423 },
-        { name: 'Germany', flag: '\u{1F1E9}\u{1F1EA}', clicks: 312 },
-        { name: 'United Kingdom', flag: '\u{1F1EC}\u{1F1E7}', clicks: 189 },
-        { name: 'Spain', flag: '\u{1F1EA}\u{1F1F8}', clicks: 145 },
-        { name: 'Morocco', flag: '\u{1F1F2}\u{1F1E6}', clicks: 98 },
-        { name: 'Belgium', flag: '\u{1F1E7}\u{1F1EA}', clicks: 76 },
-        { name: 'Canada', flag: '\u{1F1E8}\u{1F1E6}', clicks: 64 },
-        { name: 'Switzerland', flag: '\u{1F1E8}\u{1F1ED}', clicks: 52 },
-        { name: 'Netherlands', flag: '\u{1F1F3}\u{1F1F1}', clicks: 41 },
-    ],
-    cities: [
-        { name: 'Paris', country: 'France', flag: '\u{1F1EB}\u{1F1F7}', clicks: 420 },
-        { name: 'New York', country: 'United States', flag: '\u{1F1FA}\u{1F1F8}', clicks: 235 },
-        { name: 'Berlin', country: 'Germany', flag: '\u{1F1E9}\u{1F1EA}', clicks: 188 },
-        { name: 'Lyon', country: 'France', flag: '\u{1F1EB}\u{1F1F7}', clicks: 147 },
-        { name: 'London', country: 'United Kingdom', flag: '\u{1F1EC}\u{1F1E7}', clicks: 144 },
-        { name: 'Marseille', country: 'France', flag: '\u{1F1EB}\u{1F1F7}', clicks: 98 },
-        { name: 'Madrid', country: 'Spain', flag: '\u{1F1EA}\u{1F1F8}', clicks: 87 },
-        { name: 'Casablanca', country: 'Morocco', flag: '\u{1F1F2}\u{1F1E6}', clicks: 65 },
-        { name: 'Bordeaux', country: 'France', flag: '\u{1F1EB}\u{1F1F7}', clicks: 54 },
-        { name: 'Brussels', country: 'Belgium', flag: '\u{1F1E7}\u{1F1EA}', clicks: 48 },
-    ],
-    devices: [
-        { name: 'Desktop', clicks: 1245 },
-        { name: 'Mobile', clicks: 871 },
-        { name: 'Tablet', clicks: 131 },
-    ],
-    browsers: [
-        { name: 'Chrome', clicks: 992 },
-        { name: 'Safari', clicks: 634 },
-        { name: 'Firefox', clicks: 287 },
-        { name: 'Edge', clicks: 156 },
-        { name: 'Other', clicks: 47 },
-    ],
-    os: [
-        { name: 'Windows', clicks: 678 },
-        { name: 'macOS', clicks: 489 },
-        { name: 'iOS', clicks: 512 },
-        { name: 'Android', clicks: 359 },
-        { name: 'Linux', clicks: 78 },
-    ],
+async function getLinkIdsForScope(
+    wsId: string,
+    params: { linkId?: string | null; campaignId?: string | null; folderId?: string | null; channel?: string | null }
+): Promise<string[] | null> {
+    const { linkId, campaignId, folderId, channel } = params
+    if (linkId) return [linkId]
+    if (!campaignId && !folderId && !channel) return null
+
+    const admin = createAdminClient()
+    let query = admin.from('ShortLink').select('id').eq('workspace_id', wsId)
+    if (campaignId) query = query.eq('campaign_id', campaignId)
+    if (folderId) query = query.eq('folder_id', folderId)
+    if (channel) query = query.eq('channel', channel)
+    const { data } = await query
+    return (data || []).map((l: { id: string }) => l.id)
 }
 
-function hashString(str: string): number {
-    let hash = 0
-    for (let i = 0; i < str.length; i++) {
-        hash = ((hash << 5) - hash) + str.charCodeAt(i)
-        hash |= 0
+function buildLinkIdFilter(linkIds: string[] | null): string {
+    if (!linkIds) return ''
+    if (linkIds.length === 0) return 'AND 1=0'
+    const escaped = linkIds.map(id => `'${sanitizeUUID(id) || ''}'`).join(',')
+    return `AND link_id IN (${escaped})`
+}
+
+type Dimension = 'countries' | 'cities' | 'devices' | 'browsers' | 'os'
+
+function buildDimensionSQL(dimension: Dimension, baseWhere: string, linkFilter: string, crossFilter: string): string {
+    switch (dimension) {
+        case 'countries':
+            return `SELECT country as name, count() as clicks FROM clicks WHERE ${baseWhere} ${linkFilter} ${crossFilter} AND country != '' GROUP BY country ORDER BY clicks DESC LIMIT 10 FORMAT JSON`
+        case 'cities':
+            return `SELECT city as name, country, count() as clicks FROM clicks WHERE ${baseWhere} ${linkFilter} ${crossFilter} AND city != '' GROUP BY city, country ORDER BY clicks DESC LIMIT 10 FORMAT JSON`
+        case 'devices':
+            return `SELECT device as name, count() as clicks FROM clicks WHERE ${baseWhere} ${linkFilter} ${crossFilter} AND device != '' GROUP BY device ORDER BY clicks DESC FORMAT JSON`
+        case 'browsers':
+            return `SELECT
+                CASE
+                    WHEN positionCaseInsensitive(user_agent, 'Edg') > 0 THEN 'Edge'
+                    WHEN positionCaseInsensitive(user_agent, 'OPR') > 0 OR positionCaseInsensitive(user_agent, 'Opera') > 0 THEN 'Opera'
+                    WHEN positionCaseInsensitive(user_agent, 'Firefox') > 0 THEN 'Firefox'
+                    WHEN positionCaseInsensitive(user_agent, 'Chrome') > 0 THEN 'Chrome'
+                    WHEN positionCaseInsensitive(user_agent, 'Safari') > 0 THEN 'Safari'
+                    ELSE 'Other'
+                END as name,
+                count() as clicks
+                FROM clicks WHERE ${baseWhere} ${linkFilter} ${crossFilter}
+                GROUP BY name ORDER BY clicks DESC FORMAT JSON`
+        case 'os':
+            return `SELECT
+                CASE
+                    WHEN positionCaseInsensitive(user_agent, 'iPhone') > 0 OR positionCaseInsensitive(user_agent, 'iPad') > 0 THEN 'iOS'
+                    WHEN positionCaseInsensitive(user_agent, 'Android') > 0 THEN 'Android'
+                    WHEN positionCaseInsensitive(user_agent, 'Mac OS X') > 0 OR positionCaseInsensitive(user_agent, 'Macintosh') > 0 THEN 'macOS'
+                    WHEN positionCaseInsensitive(user_agent, 'Windows') > 0 THEN 'Windows'
+                    WHEN positionCaseInsensitive(user_agent, 'Linux') > 0 THEN 'Linux'
+                    ELSE 'Other'
+                END as name,
+                count() as clicks
+                FROM clicks WHERE ${baseWhere} ${linkFilter} ${crossFilter}
+                GROUP BY name ORDER BY clicks DESC FORMAT JSON`
     }
-    return Math.abs(hash)
 }
 
 export async function GET(request: NextRequest) {
-    // Auth check
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    const workspace = await getCurrentUserWorkspace()
+    if (!workspace) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
-    const dimension = searchParams.get('dimension') || 'countries'
-    const source = searchParams.get('source')
+    const dimension = (searchParams.get('dimension') || 'countries') as Dimension
     const linkId = searchParams.get('link_id')
     const campaignId = searchParams.get('campaign_id')
     const folderId = searchParams.get('folder_id')
     const channel = searchParams.get('channel')
+    const dateFromParam = searchParams.get('date_from')
+    const dateToParam = searchParams.get('date_to')
 
-    // Determine scale and hash based on scope
-    let scale = source === 'marketing' ? 0.3 : 1
-    let scopeHash = 0
-    let isScoped = false
-
-    if (linkId) {
-        scale *= 0.15
-        scopeHash = hashString(linkId)
-        isScoped = true
-    } else if (campaignId) {
-        scale *= 0.5
-        scopeHash = hashString(campaignId)
-        isScoped = true
-    } else if (folderId) {
-        scale *= 0.4
-        scopeHash = hashString(folderId)
-        isScoped = true
-    } else if (channel) {
-        scale *= 0.4
-        scopeHash = hashString(channel)
-        isScoped = true
+    if (!isTinybirdConfigured()) {
+        return NextResponse.json({ data: [], dimension }, {
+            headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' }
+        })
     }
 
-    let data = (MOCK_DATA[dimension] || []).map((item, idx) => ({
-        ...item,
-        clicks: Math.max(1, Math.floor((item.clicks as number) * scale * (isScoped ? (0.5 + ((scopeHash + idx * 37) % 100) / 100) : 1))),
-    }))
-
-    // For scoped views (not workspace-wide), return fewer items
-    if (linkId) {
-        data = data.slice(0, 5)
-    } else if (isScoped) {
-        data = data.slice(0, 7)
+    const wsId = sanitizeUUID(workspace.workspaceId)
+    if (!wsId) {
+        return NextResponse.json({ data: [], dimension }, {
+            headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' }
+        })
     }
 
-    return NextResponse.json({
-        data,
-        dimension,
-    }, {
-        headers: {
-            'Cache-Control': 'no-store, no-cache, must-revalidate',
+    const now = new Date()
+    const dateTo = sanitizeDateString(dateToParam) || now.toISOString().split('T')[0]
+    const dateFrom = sanitizeDateString(dateFromParam) || new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+
+    // Cross-filtering: exclude the current dimension from filters to avoid double-filtering
+    const crossFilterParams: Record<string, string | undefined> = {
+        country: searchParams.get('country') || undefined,
+        city: searchParams.get('city') || undefined,
+        region: searchParams.get('region') || undefined,
+        continent: searchParams.get('continent') || undefined,
+        device: searchParams.get('device') || undefined,
+        browser: searchParams.get('browser') || undefined,
+        os: searchParams.get('os') || undefined,
+    }
+    // Remove current dimension from cross-filter
+    if (dimension === 'countries') { delete crossFilterParams.country; delete crossFilterParams.continent }
+    if (dimension === 'cities') { delete crossFilterParams.city; delete crossFilterParams.region }
+    if (dimension === 'devices') delete crossFilterParams.device
+    if (dimension === 'browsers') delete crossFilterParams.browser
+    if (dimension === 'os') delete crossFilterParams.os
+
+    const crossFilter = buildClicksFilterSQL(crossFilterParams)
+    const linkIds = await getLinkIdsForScope(wsId, { linkId, campaignId, folderId, channel })
+    const linkFilter = buildLinkIdFilter(linkIds)
+    const baseWhere = `workspace_id = '${wsId}' AND timestamp >= '${dateFrom}' AND timestamp <= '${dateTo} 23:59:59'`
+
+    try {
+        const sql = buildDimensionSQL(dimension, baseWhere, linkFilter, crossFilter)
+        const result = await executeTinybirdSQL(sql)
+        let data = result?.data || []
+
+        // Add country flags for countries and cities
+        if (dimension === 'countries') {
+            data = data.map((row: { name: string; clicks: number }) => ({
+                ...row,
+                flag: COUNTRY_FLAGS[row.name] || '',
+            }))
+        } else if (dimension === 'cities') {
+            data = data.map((row: { name: string; country: string; clicks: number }) => ({
+                ...row,
+                flag: COUNTRY_FLAGS[row.country] || '',
+            }))
         }
-    })
+
+        return NextResponse.json({ data, dimension }, {
+            headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' }
+        })
+    } catch (error) {
+        console.error('[stats/breakdown] Tinybird query error:', error)
+        return NextResponse.json({ data: [], dimension }, {
+            headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' }
+        })
+    }
 }
