@@ -91,6 +91,7 @@ export async function createMarketingLink(input: MarketingLinkInput) {
 
     try {
         const { data: link, error } = await supabase.from('ShortLink').insert({
+            id: crypto.randomUUID(),
             slug,
             original_url: targetUrl,
             workspace_id: workspace.workspaceId,
@@ -506,7 +507,7 @@ export async function createMarketingTag(name: string, color: string) {
 
     const supabase = createAdminClient()
     const { data: tag, error } = await supabase.from('MarketingTag').insert({
-        name: name.trim(), color, workspace_id: workspace.workspaceId,
+        id: crypto.randomUUID(), name: name.trim(), color, workspace_id: workspace.workspaceId,
     }).select().single()
 
     if (error) return { success: false, error: 'Tag name already exists' }

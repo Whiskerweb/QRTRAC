@@ -50,6 +50,7 @@ export async function createMarketingFolder(input: CreateFolderInput) {
     }
 
     const { data: folder, error } = await supabase.from('MarketingFolder').insert({
+        id: crypto.randomUUID(),
         name: input.name.trim(),
         color: input.color || null,
         position: maxPosition + 1,

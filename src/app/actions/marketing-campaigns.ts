@@ -20,6 +20,7 @@ export async function createMarketingCampaign(input: CreateCampaignInput) {
 
     const supabase = createAdminClient()
     const { data: campaign, error } = await supabase.from('MarketingCampaign').insert({
+        id: crypto.randomUUID(),
         name: input.name.trim(),
         description: input.description?.trim() || null,
         color: input.color || null,
