@@ -114,7 +114,7 @@ export async function createMarketingLink(input: MarketingLinkInput) {
 
         // Connect tags via join table
         if (input.tagIds?.length) {
-            await supabase.from('_MarketingTagToShortLink').insert(
+            await supabase.from('_ShortLinkTags').insert(
                 input.tagIds.map(tagId => ({ A: tagId, B: link.id }))
             )
         }
@@ -195,7 +195,7 @@ export async function getMarketingLinks(filters?: {
 
         // Get tag relations
         const { data: tagRelations } = await supabase
-            .from('_MarketingTagToShortLink')
+            .from('_ShortLinkTags')
             .select('A, B')
             .in('B', linkIds)
 
@@ -290,7 +290,7 @@ export async function getMarketingLink(id: string) {
 
     // Fetch tags
     const { data: tagRelations } = await supabase
-        .from('_MarketingTagToShortLink')
+        .from('_ShortLinkTags')
         .select('A')
         .eq('B', id)
 
@@ -401,7 +401,7 @@ export async function deleteMarketingLink(id: string) {
     }
 
     // Remove tag relations first
-    await supabase.from('_MarketingTagToShortLink').delete().eq('B', id)
+    await supabase.from('_ShortLinkTags').delete().eq('B', id)
     await supabase.from('ShortLink').delete().eq('id', id)
 
     const { deleteLinkFromRedis } = await import('@/lib/redis')
@@ -522,7 +522,7 @@ export async function deleteMarketingTag(id: string) {
     const { data: tag } = await supabase.from('MarketingTag').select('workspace_id').eq('id', id).single()
     if (!tag || tag.workspace_id !== workspace.workspaceId) return { success: false, error: 'Tag not found' }
 
-    await supabase.from('_MarketingTagToShortLink').delete().eq('A', id)
+    await supabase.from('_ShortLinkTags').delete().eq('A', id)
     await supabase.from('MarketingTag').delete().eq('id', id)
 
     return { success: true }
@@ -544,7 +544,7 @@ export async function getMarketingTags() {
     // Count links per tag
     const tagIds = tags.map(t => t.id)
     const { data: relations } = await supabase
-        .from('_MarketingTagToShortLink')
+        .from('_ShortLinkTags')
         .select('A')
         .in('A', tagIds)
 
@@ -568,9 +568,9 @@ export async function setLinkTags(linkId: string, tagIds: string[]) {
     if (!link || link.workspace_id !== workspace.workspaceId) return { success: false, error: 'Link not found' }
 
     // Replace all tags: delete existing, insert new
-    await supabase.from('_MarketingTagToShortLink').delete().eq('B', linkId)
+    await supabase.from('_ShortLinkTags').delete().eq('B', linkId)
     if (tagIds.length > 0) {
-        await supabase.from('_MarketingTagToShortLink').insert(
+        await supabase.from('_ShortLinkTags').insert(
             tagIds.map(tagId => ({ A: tagId, B: linkId }))
         )
     }
@@ -637,7 +637,7 @@ export async function bulkDeleteLinks(linkIds: string[]) {
     if ('error' in result) return { success: false, error: result.error }
     const { links, supabase } = result
 
-    await supabase.from('_MarketingTagToShortLink').delete().in('B', linkIds)
+    await supabase.from('_ShortLinkTags').delete().in('B', linkIds)
     await supabase.from('ShortLink').delete().in('id', linkIds)
 
     const { deleteLinkFromRedis } = await import('@/lib/redis')
@@ -678,7 +678,7 @@ export async function bulkAddTags(linkIds: string[], tagIds: string[]) {
 
     // Get existing relations to avoid duplicates
     const { data: existing } = await result.supabase
-        .from('_MarketingTagToShortLink')
+        .from('_ShortLinkTags')
         .select('A, B')
         .in('B', linkIds)
         .in('A', tagIds)
@@ -695,7 +695,7 @@ export async function bulkAddTags(linkIds: string[], tagIds: string[]) {
     }
 
     if (inserts.length > 0) {
-        await result.supabase.from('_MarketingTagToShortLink').insert(inserts)
+        await result.supabase.from('_ShortLinkTags').insert(inserts)
     }
 
 
@@ -707,7 +707,7 @@ export async function bulkRemoveTags(linkIds: string[], tagIds: string[]) {
     if ('error' in result) return { success: false, error: result.error }
 
     await result.supabase
-        .from('_MarketingTagToShortLink')
+        .from('_ShortLinkTags')
         .delete()
         .in('B', linkIds)
         .in('A', tagIds)
