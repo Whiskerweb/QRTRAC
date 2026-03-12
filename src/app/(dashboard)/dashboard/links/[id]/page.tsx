@@ -1,16 +1,15 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter, useParams } from 'next/navigation'
 import useSWR from 'swr'
 import { motion } from 'framer-motion'
 import { fadeInUp, staggerContainer, springGentle } from '@/lib/animations'
-import { subDays, format } from 'date-fns'
 import {
     ArrowLeft, Copy, ExternalLink,
     Check, Link2, Calendar, Tag, Trash2, Pencil, Folder,
-    Globe, Monitor, BarChart3
+    BarChart3
 } from 'lucide-react'
 import { getMarketingLink, deleteMarketingLink, updateMarketingLink } from '@/app/actions/marketing-links'
 import { toast } from 'sonner'
@@ -43,42 +42,11 @@ interface LinkData {
 
 interface KPIData {
     clicks: number
-    leads: number
-    sales: number
-    revenue: number
-    timeseries?: Array<{ date: string; clicks: number; leads: number; sales: number; revenue: number }>
-}
-
-interface BreakdownItem {
-    name: string
-    clicks: number
-    flag?: string
 }
 
 type StatsScope = 'link' | 'campaign' | 'folder' | 'channel' | 'workspace'
 
-const kpiFetcher = (url: string) => fetch(url).then(r => r.json()).then(d => d.data?.[0] || { clicks: 0, leads: 0, sales: 0, revenue: 0 })
-const breakdownFetcher = (url: string) => fetch(url).then(r => r.json()).then(d => d.data || [])
-
-function bucketTimeseriesData(data: KPIData['timeseries'], maxBuckets: number) {
-    if (!data || data.length <= maxBuckets) return data || []
-    const bucketSize = Math.ceil(data.length / maxBuckets)
-    const buckets = []
-    for (let i = 0; i < data.length; i += bucketSize) {
-        const slice = data.slice(i, i + bucketSize)
-        const label = slice.length === 1
-            ? slice[0].date
-            : `${slice[0].date.slice(5)} - ${slice[slice.length - 1].date.slice(5)}`
-        buckets.push({
-            date: label,
-            clicks: slice.reduce((s, d) => s + d.clicks, 0),
-            leads: slice.reduce((s, d) => s + d.leads, 0),
-            sales: slice.reduce((s, d) => s + d.sales, 0),
-            revenue: slice.reduce((s, d) => s + d.revenue, 0),
-        })
-    }
-    return buckets
-}
+const kpiFetcher = (url: string) => fetch(url).then(r => r.json()).then(d => d.data?.[0] || { clicks: 0 })
 
 export default function LinkDetailPage() {
     const t = useTranslations('marketing')
@@ -90,9 +58,7 @@ export default function LinkDetailPage() {
     const [loading, setLoading] = useState(true)
     const [copied, setCopied] = useState(false)
     const [editingField, setEditingField] = useState<string | null>(null)
-    const [selectedDays, setSelectedDays] = useState(30)
     const [statsScope, setStatsScope] = useState<StatsScope>('link')
-    const [activeEventTypes, setActiveEventTypes] = useState<Set<string>>(new Set(['clicks', 'leads', 'sales']))
 
     useEffect(() => {
         getMarketingLink(linkId).then(res => {
@@ -106,10 +72,6 @@ export default function LinkDetailPage() {
         })
     }, [linkId])
 
-    // Analytics data — build query params based on scope
-    const dateFrom = format(subDays(new Date(), selectedDays), 'yyyy-MM-dd')
-    const dateTo = format(new Date(), 'yyyy-MM-dd')
-
     const statsFilter = useMemo(() => {
         if (!link) return ''
         switch (statsScope) {
@@ -121,35 +83,15 @@ export default function LinkDetailPage() {
         }
     }, [statsScope, link, linkId])
 
-    const kpiUrl = link ? `/api/stats/kpi?${statsFilter}${statsFilter ? '&' : ''}date_from=${dateFrom}&date_to=${dateTo}` : null
-    const breakdownBase = link ? `/api/stats/breakdown?${statsFilter}${statsFilter ? '&' : ''}` : null
+    const kpiUrl = link ? `/api/stats/kpi?${statsFilter}` : null
 
-    const { data: kpi, isValidating } = useSWR<KPIData>(
+    const { data: kpi } = useSWR<KPIData>(
         kpiUrl,
         kpiFetcher,
         { revalidateOnFocus: false }
     )
-    const { data: countriesData } = useSWR<BreakdownItem[]>(
-        breakdownBase ? `${breakdownBase}dimension=countries` : null,
-        breakdownFetcher,
-        { revalidateOnFocus: false }
-    )
-    const { data: devicesData } = useSWR<BreakdownItem[]>(
-        breakdownBase ? `${breakdownBase}dimension=devices` : null,
-        breakdownFetcher,
-        { revalidateOnFocus: false }
-    )
 
-    const kpiData = kpi || { clicks: 0, leads: 0, sales: 0, revenue: 0 }
-    const displayTimeseries = useMemo(() => bucketTimeseriesData(kpi?.timeseries, 20), [kpi?.timeseries])
-
-    const toggleEventType = useCallback((type: 'clicks' | 'leads' | 'sales') => {
-        setActiveEventTypes(prev => {
-            if (prev.size === 3) return new Set([type])
-            if (prev.size === 1 && prev.has(type)) return new Set(['clicks', 'leads', 'sales'])
-            return new Set([type])
-        })
-    }, [])
+    const kpiData = kpi || { clicks: 0 }
 
     const handleCopy = async () => {
         if (!link) return
@@ -233,11 +175,6 @@ export default function LinkDetailPage() {
         { key: 'utm_term', value: link.utm_term },
         { key: 'utm_content', value: link.utm_content },
     ].filter(u => u.value)
-
-    const countries = countriesData || []
-    const devices = devicesData || []
-    const maxCountry = Math.max(...countries.map(c => c.clicks), 1)
-    const maxDevice = Math.max(...devices.map(d => d.clicks), 1)
 
     return (
         <motion.div
@@ -390,80 +327,9 @@ export default function LinkDetailPage() {
                 </div>
             </motion.div>
 
-            {/* Analytics Funnel */}
+            {/* Analytics — Clicks only */}
             <motion.div variants={fadeInUp} transition={springGentle}>
-                <AnalyticsChart
-                    clicks={kpiData.clicks}
-                    leads={kpiData.leads}
-                    sales={kpiData.sales}
-                    revenue={kpiData.revenue}
-                    timeseries={displayTimeseries}
-                    activeEventTypes={activeEventTypes}
-                    onEventTypeToggle={toggleEventType}
-                    selectedDays={selectedDays}
-                    onRangeChange={setSelectedDays}
-                    loadingTimeseries={isValidating}
-                />
-            </motion.div>
-
-            {/* Breakdown Cards */}
-            <motion.div variants={fadeInUp} transition={springGentle} className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                {/* Countries */}
-                <div className="bg-white/70 backdrop-blur-sm border border-gray-200/60 rounded-2xl overflow-hidden shadow-sm">
-                    <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
-                        <Globe className="w-4 h-4 text-gray-400" />
-                        <h3 className="text-sm font-semibold text-gray-700">Pays</h3>
-                        <span className="ml-auto text-[11px] text-gray-400 font-medium uppercase">Clicks</span>
-                    </div>
-                    <div className="p-4 space-y-2.5">
-                        {countries.length === 0 ? (
-                            <p className="text-sm text-gray-400 text-center py-4">Aucune donnee</p>
-                        ) : countries.map((item) => (
-                            <div key={item.name}>
-                                <div className="flex items-center justify-between mb-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-base leading-none">{item.flag}</span>
-                                        <span className="text-[13px] font-medium text-gray-700">{item.name}</span>
-                                    </div>
-                                    <span className="text-[13px] font-semibold text-gray-900 tabular-nums">{item.clicks.toLocaleString()}</span>
-                                </div>
-                                <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full rounded-full bg-gray-300 transition-all duration-700 ease-out"
-                                        style={{ width: `${Math.max((item.clicks / maxCountry) * 100, 2)}%` }}
-                                    />
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Devices */}
-                <div className="bg-white/70 backdrop-blur-sm border border-gray-200/60 rounded-2xl overflow-hidden shadow-sm">
-                    <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
-                        <Monitor className="w-4 h-4 text-gray-400" />
-                        <h3 className="text-sm font-semibold text-gray-700">Appareils</h3>
-                        <span className="ml-auto text-[11px] text-gray-400 font-medium uppercase">Clicks</span>
-                    </div>
-                    <div className="p-4 space-y-2.5">
-                        {devices.length === 0 ? (
-                            <p className="text-sm text-gray-400 text-center py-4">Aucune donnee</p>
-                        ) : devices.map((item) => (
-                            <div key={item.name}>
-                                <div className="flex items-center justify-between mb-1">
-                                    <span className="text-[13px] font-medium text-gray-700">{item.name}</span>
-                                    <span className="text-[13px] font-semibold text-gray-900 tabular-nums">{item.clicks.toLocaleString()}</span>
-                                </div>
-                                <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full rounded-full bg-gray-300 transition-all duration-700 ease-out"
-                                        style={{ width: `${Math.max((item.clicks / maxDevice) * 100, 2)}%` }}
-                                    />
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+                <AnalyticsChart clicks={kpiData.clicks} />
             </motion.div>
 
             {/* Editable Properties */}
