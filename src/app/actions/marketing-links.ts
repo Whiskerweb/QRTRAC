@@ -110,7 +110,10 @@ export async function createMarketingLink(input: MarketingLinkInput) {
             og_image: input.og_image || null,
         }).select().single()
 
-        if (error || !link) return { success: false, error: 'Failed to create link' }
+        if (error || !link) {
+            console.error('[createMarketingLink] insert error:', error?.message, error?.details, error?.hint)
+            return { success: false, error: `Failed to create link: ${error?.message || 'no data returned'}` }
+        }
 
         // Connect tags via join table
         if (input.tagIds?.length) {
@@ -146,8 +149,8 @@ export async function createMarketingLink(input: MarketingLinkInput) {
             }
         }
     } catch (error) {
-        console.error('[Marketing] Error creating link:', error)
-        return { success: false, error: 'Failed to create link' }
+        console.error('[createMarketingLink] exception:', error)
+        return { success: false, error: `Failed to create link: ${error instanceof Error ? error.message : String(error)}` }
     }
 }
 
