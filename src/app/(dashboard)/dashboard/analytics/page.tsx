@@ -1,16 +1,74 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import useSWR from 'swr'
 import { motion } from 'framer-motion'
 import { fadeInUp, staggerContainer, springGentle } from '@/lib/animations'
 import {
+    Calendar,
+    RefreshCw,
     Globe,
+    Monitor,
+    Smartphone,
+    Laptop,
+    Check,
+    ChevronDown,
+    X,
     TrendingUp,
 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { getMarketingLinks } from '@/app/actions/marketing-links'
 import { getChannelConfig } from '@/lib/marketing/channels'
+import { subDays, format } from 'date-fns'
 import { AnalyticsChart } from '@/components/dashboard/AnalyticsChart'
+import { toast } from 'sonner'
+
+// =============================================
+// TYPES & FETCHER
+// =============================================
+
+interface KPIData {
+    clicks: number
+    leads: number
+    sales: number
+    revenue: number
+    timeseries?: Array<{
+        date: string
+        clicks: number
+        leads: number
+        sales: number
+        revenue: number
+    }>
+}
+
+interface KPIResponse {
+    data: KPIData[]
+}
+
+interface ActiveFilter {
+    type: 'country' | 'device' | 'city' | 'region' | 'continent' | 'browser' | 'os' | 'event_type' | 'campaign'
+    value: string
+    label: string
+    icon?: React.ReactNode
+}
+
+interface LocationItem {
+    name: string
+    flag: string
+    count: number
+    country?: string
+}
+
+interface DeviceItem {
+    name: string
+    count: number
+    icon: React.ComponentType<{ className?: string }>
+}
+
+interface AnalyticsItem {
+    name: string
+    count: number
+}
 
 interface LinkData {
     id: string
@@ -21,11 +79,249 @@ interface LinkData {
     campaign_id: string | null
 }
 
+const kpiFetcher = async (url: string): Promise<KPIResponse> => {
+    const res = await fetch(`${url}&_t=${Date.now()}`, {
+        cache: 'no-store',
+        credentials: 'include'
+    })
+    if (!res.ok) throw new Error('Failed to fetch')
+    return res.json()
+}
+
+const breakdownFetcher = async (url: string) => {
+    const res = await fetch(url, { cache: 'no-store', credentials: 'include' })
+    if (!res.ok) return { data: [] }
+    return res.json()
+}
+
+// =============================================
+// DATE RANGES
+// =============================================
+
+const DATE_RANGES = [
+    { label: 'Today', value: 'today', days: 0 },
+    { label: 'Yesterday', value: 'yesterday', days: 1 },
+    { label: 'Last 7 days', value: '7d', days: 7 },
+    { label: 'Last 14 days', value: '14d', days: 14 },
+    { label: 'Last 30 days', value: '30d', days: 30 },
+    { label: 'Last 90 days', value: '90d', days: 90 },
+    { label: 'Last 12 months', value: '12m', days: 365 },
+    { label: 'All time', value: 'all', days: 3650 },
+]
+
+// =============================================
+// GEO DATA MAPS
+// =============================================
+
+const COUNTRY_INFO: Record<string, { name: string; flag: string }> = {
+    'France': { name: 'France', flag: '\u{1F1EB}\u{1F1F7}' }, 'Germany': { name: 'Germany', flag: '\u{1F1E9}\u{1F1EA}' },
+    'United Kingdom': { name: 'United Kingdom', flag: '\u{1F1EC}\u{1F1E7}' }, 'United States': { name: 'United States', flag: '\u{1F1FA}\u{1F1F8}' },
+    'Morocco': { name: 'Morocco', flag: '\u{1F1F2}\u{1F1E6}' }, 'Spain': { name: 'Spain', flag: '\u{1F1EA}\u{1F1F8}' },
+    'Italy': { name: 'Italy', flag: '\u{1F1EE}\u{1F1F9}' }, 'Canada': { name: 'Canada', flag: '\u{1F1E8}\u{1F1E6}' },
+    'Netherlands': { name: 'Netherlands', flag: '\u{1F1F3}\u{1F1F1}' }, 'Belgium': { name: 'Belgium', flag: '\u{1F1E7}\u{1F1EA}' },
+    'Switzerland': { name: 'Switzerland', flag: '\u{1F1E8}\u{1F1ED}' }, 'Japan': { name: 'Japan', flag: '\u{1F1EF}\u{1F1F5}' },
+    'Australia': { name: 'Australia', flag: '\u{1F1E6}\u{1F1FA}' }, 'Brazil': { name: 'Brazil', flag: '\u{1F1E7}\u{1F1F7}' },
+    'FR': { name: 'France', flag: '\u{1F1EB}\u{1F1F7}' }, 'DE': { name: 'Germany', flag: '\u{1F1E9}\u{1F1EA}' },
+    'GB': { name: 'United Kingdom', flag: '\u{1F1EC}\u{1F1E7}' }, 'US': { name: 'United States', flag: '\u{1F1FA}\u{1F1F8}' },
+    'MA': { name: 'Morocco', flag: '\u{1F1F2}\u{1F1E6}' }, 'ES': { name: 'Spain', flag: '\u{1F1EA}\u{1F1F8}' },
+    'IT': { name: 'Italy', flag: '\u{1F1EE}\u{1F1F9}' }, 'CA': { name: 'Canada', flag: '\u{1F1E8}\u{1F1E6}' },
+    'NL': { name: 'Netherlands', flag: '\u{1F1F3}\u{1F1F1}' }, 'BE': { name: 'Belgium', flag: '\u{1F1E7}\u{1F1EA}' },
+    'CH': { name: 'Switzerland', flag: '\u{1F1E8}\u{1F1ED}' }, 'JP': { name: 'Japan', flag: '\u{1F1EF}\u{1F1F5}' },
+    'AU': { name: 'Australia', flag: '\u{1F1E6}\u{1F1FA}' }, 'BR': { name: 'Brazil', flag: '\u{1F1E7}\u{1F1F7}' },
+    'PT': { name: 'Portugal', flag: '\u{1F1F5}\u{1F1F9}' }, 'PL': { name: 'Poland', flag: '\u{1F1F5}\u{1F1F1}' },
+    'IN': { name: 'India', flag: '\u{1F1EE}\u{1F1F3}' }, 'CN': { name: 'China', flag: '\u{1F1E8}\u{1F1F3}' },
+}
+
+const COUNTRY_FLAGS: Record<string, string> = {
+    'France': '\u{1F1EB}\u{1F1F7}', 'FR': '\u{1F1EB}\u{1F1F7}', 'Germany': '\u{1F1E9}\u{1F1EA}', 'DE': '\u{1F1E9}\u{1F1EA}',
+    'United Kingdom': '\u{1F1EC}\u{1F1E7}', 'GB': '\u{1F1EC}\u{1F1E7}', 'United States': '\u{1F1FA}\u{1F1F8}', 'US': '\u{1F1FA}\u{1F1F8}',
+    'Morocco': '\u{1F1F2}\u{1F1E6}', 'MA': '\u{1F1F2}\u{1F1E6}', 'Spain': '\u{1F1EA}\u{1F1F8}', 'ES': '\u{1F1EA}\u{1F1F8}',
+    'Italy': '\u{1F1EE}\u{1F1F9}', 'IT': '\u{1F1EE}\u{1F1F9}', 'Canada': '\u{1F1E8}\u{1F1E6}', 'CA': '\u{1F1E8}\u{1F1E6}',
+    'Netherlands': '\u{1F1F3}\u{1F1F1}', 'NL': '\u{1F1F3}\u{1F1F1}', 'Belgium': '\u{1F1E7}\u{1F1EA}', 'BE': '\u{1F1E7}\u{1F1EA}',
+    'Switzerland': '\u{1F1E8}\u{1F1ED}', 'CH': '\u{1F1E8}\u{1F1ED}', 'Japan': '\u{1F1EF}\u{1F1F5}', 'JP': '\u{1F1EF}\u{1F1F5}',
+    'Australia': '\u{1F1E6}\u{1F1FA}', 'AU': '\u{1F1E6}\u{1F1FA}', 'Brazil': '\u{1F1E7}\u{1F1F7}', 'BR': '\u{1F1E7}\u{1F1F7}',
+    'Portugal': '\u{1F1F5}\u{1F1F9}', 'PT': '\u{1F1F5}\u{1F1F9}',
+}
+
+const COUNTRY_TO_CONTINENT: Record<string, string> = {
+    'France': 'Europe', 'Germany': 'Europe', 'United Kingdom': 'Europe', 'Spain': 'Europe',
+    'Italy': 'Europe', 'Netherlands': 'Europe', 'Belgium': 'Europe', 'Switzerland': 'Europe',
+    'Portugal': 'Europe', 'Poland': 'Europe', 'United States': 'North America',
+    'Canada': 'North America', 'Mexico': 'North America', 'Brazil': 'South America',
+    'Japan': 'Asia', 'China': 'Asia', 'India': 'Asia', 'Australia': 'Oceania',
+    'Morocco': 'Africa', 'South Africa': 'Africa',
+    'FR': 'Europe', 'DE': 'Europe', 'GB': 'Europe', 'US': 'North America',
+    'CA': 'North America', 'ES': 'Europe', 'IT': 'Europe', 'NL': 'Europe',
+    'BE': 'Europe', 'CH': 'Europe', 'JP': 'Asia', 'AU': 'Oceania',
+    'BR': 'South America', 'PT': 'Europe', 'MA': 'Africa', 'IN': 'Asia', 'CN': 'Asia',
+}
+
+const CITY_TO_REGION: Record<string, string> = {
+    'Paris': '\u{00CE}le-de-France', 'Lyon': 'Auvergne-Rh\u{00F4}ne-Alpes',
+    'Marseille': 'Provence-Alpes-C\u{00F4}te d\'Azur', 'Bordeaux': 'Nouvelle-Aquitaine',
+    'Toulouse': 'Occitanie', 'Nantes': 'Pays de la Loire', 'Nice': 'Provence-Alpes-C\u{00F4}te d\'Azur',
+    'Lille': 'Hauts-de-France', 'Strasbourg': 'Grand Est', 'Rennes': 'Bretagne',
+    'Brest': 'Bretagne', 'Rouen': 'Normandie',
+}
+
+// =============================================
+// HELPERS
+// =============================================
+
 function formatNumber(n: number): string {
     if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`
     if (n >= 1000) return `${(n / 1000).toFixed(1)}K`
     return n.toLocaleString()
 }
+
+function bucketTimeseriesData(
+    data: Array<{ date: string; clicks: number; leads: number; sales: number; revenue: number }>,
+    maxPoints: number = 20
+) {
+    if (data.length <= maxPoints) return data
+    const bucketSize = Math.ceil(data.length / maxPoints)
+    const bucketed: typeof data = []
+    for (let i = 0; i < data.length; i += bucketSize) {
+        const slice = data.slice(i, Math.min(i + bucketSize, data.length))
+        if (slice.length === 0) continue
+        const startDate = slice[0].date
+        const endDate = slice[slice.length - 1].date
+        const formatShort = (d: string) => {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return d
+            const date = new Date(d + 'T00:00:00')
+            if (isNaN(date.getTime())) return d
+            return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+        }
+        const label = startDate === endDate ? formatShort(startDate) : `${formatShort(startDate)} - ${formatShort(endDate)}`
+        const aggregated = slice.reduce(
+            (acc, d) => ({ date: label, clicks: acc.clicks + d.clicks, leads: acc.leads + d.leads, sales: acc.sales + d.sales, revenue: acc.revenue + d.revenue }),
+            { date: label, clicks: 0, leads: 0, sales: 0, revenue: 0 }
+        )
+        bucketed.push(aggregated)
+    }
+    return bucketed
+}
+
+// =============================================
+// DROPDOWN
+// =============================================
+
+function Dropdown({ trigger, children, isOpen, onClose }: {
+    trigger: React.ReactNode; children: React.ReactNode; isOpen: boolean; onClose: () => void
+}) {
+    const ref = useRef<HTMLDivElement>(null)
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (ref.current && !ref.current.contains(event.target as Node)) onClose()
+        }
+        if (isOpen) document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [isOpen, onClose])
+    return (
+        <div ref={ref} className="relative">
+            {trigger}
+            {isOpen && (
+                <div className="absolute top-full left-0 mt-1.5 bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-2xl shadow-lg shadow-black/[0.03] z-50 min-w-[220px] py-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                    {children}
+                </div>
+            )}
+        </div>
+    )
+}
+
+// =============================================
+// FILTER BADGE
+// =============================================
+
+function FilterBadge({ filter, onRemove }: { filter: ActiveFilter; onRemove: () => void }) {
+    return (
+        <div className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 bg-white border border-gray-200/80 rounded-full text-[13px] shadow-sm shadow-black/[0.02] animate-in fade-in zoom-in-95 duration-200">
+            {filter.icon}
+            <span className="text-gray-400">{filter.type}</span>
+            <span className="text-gray-300">is</span>
+            <span className="font-medium text-gray-800">{filter.label}</span>
+            <button onClick={onRemove} className="ml-0.5 p-1 rounded-full hover:bg-gray-100 transition-colors">
+                <X className="w-3 h-3 text-gray-400" />
+            </button>
+        </div>
+    )
+}
+
+// =============================================
+// LIST ITEM
+// =============================================
+
+function SimpleListItem({ icon, label, count, percentage = 100, isSelected, onClick }: {
+    icon?: React.ReactNode; label: string; count: number; percentage?: number; isSelected: boolean; onClick: () => void
+}) {
+    return (
+        <div
+            onClick={onClick}
+            className={`row-hover group relative flex items-center justify-between px-4 py-2.5 cursor-pointer transition-all duration-200
+                ${isSelected
+                    ? 'bg-purple-50/60'
+                    : 'hover:bg-gray-50/60'
+                }`}
+        >
+            <div
+                className={`absolute inset-y-0 left-0 transition-all duration-500 ease-out ${isSelected ? 'bg-purple-100/50' : 'bg-gray-100/40 group-hover:bg-gray-100/60'}`}
+                style={{ width: `${Math.min(percentage * 0.55, 55)}%` }}
+            />
+            {isSelected && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-purple-500 rounded-full" />}
+
+            <div className="relative flex items-center gap-2.5">
+                {icon}
+                <span className={`text-[13px] ${isSelected ? 'font-semibold text-gray-900' : 'text-gray-700 font-medium'}`}>{label}</span>
+            </div>
+            <span className={`relative text-[13px] tabular-nums ${isSelected ? 'font-semibold text-purple-700' : 'text-gray-400 font-medium'}`}>
+                {formatNumber(count)}
+            </span>
+        </div>
+    )
+}
+
+// =============================================
+// ANALYTICS CARD
+// =============================================
+
+function AnalyticsCard({ title, tabs, activeTab, onTabChange, children, settingsLabel }: {
+    title: string; tabs?: { key: string; label: string }[]; activeTab?: string
+    onTabChange?: (tab: string) => void; children: React.ReactNode; settingsLabel?: string
+}) {
+    return (
+        <div className="bg-white/70 backdrop-blur-sm border border-gray-200/60 rounded-2xl overflow-hidden shadow-sm shadow-black/[0.02]">
+            <div className="px-5 py-3.5 border-b border-gray-100/80">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1">
+                        {tabs ? tabs.map((tab) => (
+                            <button
+                                key={tab.key}
+                                onClick={() => onTabChange?.(tab.key)}
+                                className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-200 ${
+                                    activeTab === tab.key
+                                        ? 'bg-gray-900 text-white shadow-sm'
+                                        : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                                }`}
+                            >
+                                {tab.label}
+                            </button>
+                        )) : (
+                            <span className="text-sm font-semibold text-gray-900">{title}</span>
+                        )}
+                    </div>
+                    {settingsLabel && (
+                        <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-widest">{settingsLabel}</span>
+                    )}
+                </div>
+            </div>
+            <div className="divide-y divide-gray-50/80">{children}</div>
+        </div>
+    )
+}
+
+// =============================================
+// CHANNEL BAR
+// =============================================
 
 function ChannelBar({ label, icon, color, count, total }: {
     label: string; icon: React.ReactNode; color: string; count: number; total: number
@@ -55,37 +351,178 @@ function ChannelBar({ label, icon, color, count, total }: {
     )
 }
 
-function CampaignItem({ name, clicks, maxClicks }: { name: string; clicks: number; maxClicks: number }) {
-    const pct = maxClicks > 0 ? (clicks / maxClicks) * 100 : 0
-    return (
-        <div className="group relative flex items-center justify-between px-4 py-2.5">
-            <div
-                className="absolute inset-y-0 left-0 bg-gray-100/40 transition-all duration-500 ease-out"
-                style={{ width: `${Math.min(pct * 0.55, 55)}%` }}
-            />
-            <span className="relative text-[13px] text-gray-700 font-medium">{name}</span>
-            <span className="relative text-[13px] text-gray-400 font-medium tabular-nums">
-                {formatNumber(clicks)}
-            </span>
-        </div>
-    )
-}
+// =============================================
+// MAIN PAGE
+// =============================================
 
 export default function AnalyticsPage() {
     const t = useTranslations('marketing')
 
-    const [marketingLinks, setMarketingLinks] = useState<LinkData[]>([])
-    const [loading, setLoading] = useState(true)
+    // State
+    const [dateRangeOpen, setDateRangeOpen] = useState(false)
+    const [selectedRangeValue, setSelectedRangeValue] = useState('30d')
+    const selectedRange = DATE_RANGES.find(r => r.value === selectedRangeValue) || DATE_RANGES[4]
+    const [activeFilters, setActiveFilters] = useState<ActiveFilter[]>([])
+    const [activeEventTypes, setActiveEventTypes] = useState<Set<string>>(new Set(['clicks', 'leads', 'sales']))
+    const [locationTab, setLocationTab] = useState('countries')
+    const [deviceTab, setDeviceTab] = useState('devices')
 
+    // Marketing links for channel/campaign breakdowns (DB-based)
+    const [marketingLinks, setMarketingLinks] = useState<LinkData[]>([])
     useEffect(() => {
         getMarketingLinks().then(res => {
             if (res.success) setMarketingLinks(res.data as unknown as LinkData[])
-            setLoading(false)
-        }).catch(() => setLoading(false))
+        })
     }, [])
 
-    const totalClicks = useMemo(() => marketingLinks.reduce((sum, l) => sum + l.clicks, 0), [marketingLinks])
+    // Calculate dates
+    const dateFrom = selectedRange.value === 'yesterday'
+        ? format(subDays(new Date(), 1), 'yyyy-MM-dd')
+        : format(subDays(new Date(), selectedRange.days), 'yyyy-MM-dd')
+    const dateTo = format(new Date(), 'yyyy-MM-dd')
 
+    // Build filter params for KPI
+    const buildKpiFilterParams = () => {
+        const params: string[] = []
+        const countryFilters = activeFilters.filter(f => f.type === 'country').map(f => f.value)
+        const cityFilters = activeFilters.filter(f => f.type === 'city').map(f => f.value)
+        const regionFilters = activeFilters.filter(f => f.type === 'region').map(f => f.value)
+        const continentFilters = activeFilters.filter(f => f.type === 'continent').map(f => f.value)
+        const deviceFilters = activeFilters.filter(f => f.type === 'device').map(f => f.value)
+        const browserFilters = activeFilters.filter(f => f.type === 'browser').map(f => f.value)
+        const osFilters = activeFilters.filter(f => f.type === 'os').map(f => f.value)
+        const campaignFilters = activeFilters.filter(f => f.type === 'campaign').map(f => f.value)
+        if (countryFilters.length) params.push(`country=${countryFilters.join(',')}`)
+        if (cityFilters.length) params.push(`city=${cityFilters.join(',')}`)
+        if (regionFilters.length) params.push(`region=${regionFilters.join(',')}`)
+        if (continentFilters.length) params.push(`continent=${continentFilters.join(',')}`)
+        if (deviceFilters.length) params.push(`device=${deviceFilters.join(',')}`)
+        if (browserFilters.length) params.push(`browser=${browserFilters.join(',')}`)
+        if (osFilters.length) params.push(`os=${osFilters.join(',')}`)
+        if (campaignFilters.length) params.push(`campaign_id=${campaignFilters[0]}`)
+        if (activeEventTypes.size < 3) params.push(`event_type=${Array.from(activeEventTypes).join(',')}`)
+        return params.length ? '&' + params.join('&') : ''
+    }
+
+    // Build filter params for breakdown
+    const buildFilterParams = (excludeType?: string) => {
+        const params: string[] = []
+        const countryFilters = activeFilters.filter(f => f.type === 'country').map(f => f.value)
+        const cityFilters = activeFilters.filter(f => f.type === 'city').map(f => f.value)
+        const regionFilters = activeFilters.filter(f => f.type === 'region').map(f => f.value)
+        const continentFilters = activeFilters.filter(f => f.type === 'continent').map(f => f.value)
+        const deviceFilters = activeFilters.filter(f => f.type === 'device').map(f => f.value)
+        const browserFilters = activeFilters.filter(f => f.type === 'browser').map(f => f.value)
+        const osFilters = activeFilters.filter(f => f.type === 'os').map(f => f.value)
+        const campaignFilters = activeFilters.filter(f => f.type === 'campaign').map(f => f.value)
+        if (countryFilters.length && excludeType !== 'country') params.push(`country=${countryFilters.join(',')}`)
+        if (cityFilters.length && excludeType !== 'city') params.push(`city=${cityFilters.join(',')}`)
+        if (regionFilters.length && excludeType !== 'region') params.push(`region=${regionFilters.join(',')}`)
+        if (continentFilters.length && excludeType !== 'continent') params.push(`continent=${continentFilters.join(',')}`)
+        if (deviceFilters.length && excludeType !== 'device') params.push(`device=${deviceFilters.join(',')}`)
+        if (browserFilters.length && excludeType !== 'browser') params.push(`browser=${browserFilters.join(',')}`)
+        if (osFilters.length && excludeType !== 'os') params.push(`os=${osFilters.join(',')}`)
+        if (campaignFilters.length) params.push(`campaign_id=${campaignFilters[0]}`)
+        if (activeEventTypes.size < 3) params.push(`event_type=${Array.from(activeEventTypes).join(',')}`)
+        return params.length ? '&' + params.join('&') : ''
+    }
+
+    // Fetch KPIs
+    const { data: kpiData, mutate, isValidating } = useSWR<KPIResponse>(
+        `/api/stats/kpi?source=marketing&date_from=${dateFrom}&date_to=${dateTo}${buildKpiFilterParams()}`,
+        kpiFetcher,
+        { revalidateOnFocus: false, onError: () => toast.error('Erreur de chargement des statistiques') }
+    )
+
+    // Fetch breakdowns
+    const swrOpts = { revalidateOnFocus: false, onError: () => toast.error('Erreur de chargement') }
+    const { data: countriesData } = useSWR(
+        `/api/stats/breakdown?source=marketing&dimension=countries&date_from=${dateFrom}&date_to=${dateTo}${buildFilterParams('country')}`,
+        breakdownFetcher, swrOpts
+    )
+    const { data: citiesData } = useSWR(
+        `/api/stats/breakdown?source=marketing&dimension=cities&date_from=${dateFrom}&date_to=${dateTo}${buildFilterParams('city')}`,
+        breakdownFetcher, swrOpts
+    )
+    const { data: devicesData } = useSWR(
+        `/api/stats/breakdown?source=marketing&dimension=devices&date_from=${dateFrom}&date_to=${dateTo}${buildFilterParams('device')}`,
+        breakdownFetcher, swrOpts
+    )
+    const { data: browsersData } = useSWR(
+        `/api/stats/breakdown?source=marketing&dimension=browsers&date_from=${dateFrom}&date_to=${dateTo}${buildFilterParams('browser')}`,
+        breakdownFetcher, swrOpts
+    )
+    const { data: osData } = useSWR(
+        `/api/stats/breakdown?source=marketing&dimension=os&date_from=${dateFrom}&date_to=${dateTo}${buildFilterParams('os')}`,
+        breakdownFetcher, swrOpts
+    )
+
+    // Process API data
+    const apiCountries = countriesData?.data || []
+    const apiCities = citiesData?.data || []
+    const apiDevices = devicesData?.data || []
+    const apiBrowsers = browsersData?.data || []
+    const apiOS = osData?.data || []
+    const kpi = kpiData?.data?.[0] || { clicks: 0, leads: 0, sales: 0, revenue: 0, timeseries: [] }
+
+    // Display data
+    const displayLocations = useMemo((): (LocationItem & { code: string })[] => {
+        return apiCountries.map((c: any) => {
+            const info = COUNTRY_INFO[c.name] || { name: c.name, flag: '\u{1F30D}' }
+            return { name: info.name, flag: info.flag, count: c.clicks || 0, code: c.name }
+        })
+    }, [apiCountries])
+
+    const displayDevices = useMemo((): DeviceItem[] => {
+        return apiDevices.map((d: any) => ({
+            name: d.name, icon: d.name === 'Desktop' ? Laptop : Smartphone, count: d.clicks || 0
+        }))
+    }, [apiDevices])
+
+    const displayCities = useMemo((): LocationItem[] => {
+        return apiCities.map((c: any) => ({
+            name: c.name, country: c.country || 'Unknown', flag: COUNTRY_FLAGS[c.country] || '\u{1F30D}', count: c.clicks || 0
+        }))
+    }, [apiCities])
+
+    const displayRegions = useMemo((): LocationItem[] => {
+        if (apiCities.length === 0) return []
+        const regionCounts: Record<string, number> = {}
+        apiCities.forEach((city: any) => {
+            const region = CITY_TO_REGION[city.name] || 'Other'
+            regionCounts[region] = (regionCounts[region] || 0) + (city.clicks || 0)
+        })
+        return Object.entries(regionCounts)
+            .map(([name, count]) => ({ name, flag: '\u{1F1EB}\u{1F1F7}', count }))
+            .sort((a, b) => b.count - a.count)
+    }, [apiCities])
+
+    const displayContinents = useMemo((): LocationItem[] => {
+        if (apiCountries.length === 0) return []
+        const continentCounts: Record<string, number> = {}
+        apiCountries.forEach((country: any) => {
+            const continent = COUNTRY_TO_CONTINENT[country.name] || 'Other'
+            continentCounts[continent] = (continentCounts[continent] || 0) + (country.clicks || 0)
+        })
+        const flags: Record<string, string> = {
+            'Europe': '\u{1F1EA}\u{1F1FA}', 'North America': '\u{1F30E}', 'South America': '\u{1F30E}',
+            'Asia': '\u{1F30F}', 'Africa': '\u{1F30D}', 'Oceania': '\u{1F30F}', 'Other': '\u{1F310}'
+        }
+        return Object.entries(continentCounts)
+            .map(([name, count]) => ({ name, flag: flags[name] || '\u{1F310}', count }))
+            .sort((a, b) => b.count - a.count)
+    }, [apiCountries])
+
+    const displayBrowsers = useMemo((): AnalyticsItem[] => {
+        return apiBrowsers.map((b: any) => ({ name: b.name, count: b.clicks || 0 }))
+    }, [apiBrowsers])
+
+    const displayOS = useMemo((): AnalyticsItem[] => {
+        return apiOS.map((o: any) => ({ name: o.name, count: o.clicks || 0 }))
+    }, [apiOS])
+
+    // Channel breakdown (DB-based)
+    const totalDbClicks = useMemo(() => marketingLinks.reduce((sum, l) => sum + l.clicks, 0), [marketingLinks])
     const channelBreakdown = useMemo(() => {
         const map = new Map<string, number>()
         for (const link of marketingLinks) {
@@ -97,6 +534,7 @@ export default function AnalyticsPage() {
             .sort((a, b) => b.clicks - a.clicks)
     }, [marketingLinks])
 
+    // Campaign breakdown (DB-based)
     const campaignBreakdown = useMemo(() => {
         const map = new Map<string, { clicks: number; id: string | null }>()
         for (const link of marketingLinks) {
@@ -108,24 +546,67 @@ export default function AnalyticsPage() {
             }
         }
         return Array.from(map.entries())
-            .map(([name, { clicks }]) => ({ name, clicks }))
+            .map(([name, { clicks, id }]) => ({ name, clicks, id }))
             .sort((a, b) => b.clicks - a.clicks)
     }, [marketingLinks])
 
-    const maxCampaign = Math.max(...campaignBreakdown.map(c => c.clicks), 1)
+    // Timeseries
+    const displayTimeseries = useMemo(() => {
+        const ts = kpi.timeseries || []
+        if (ts.length === 0) return []
+        return bucketTimeseriesData(ts, 20)
+    }, [kpi.timeseries])
 
-    if (loading) {
-        return (
-            <div className="space-y-6">
-                <div className="h-8 w-48 bg-gray-200 rounded animate-pulse" />
-                <div className="h-24 bg-gray-100 rounded-2xl animate-pulse" />
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                    <div className="h-64 bg-gray-100 rounded-2xl animate-pulse" />
-                    <div className="h-64 bg-gray-100 rounded-2xl animate-pulse" />
-                </div>
-            </div>
-        )
+    // Max values for percentage bars
+    const maxLocation = Math.max(...displayLocations.map(l => l.count), 1)
+    const maxDevice = Math.max(...displayDevices.map(d => d.count), 1)
+    const maxCity = Math.max(...displayCities.map(c => c.count), 1)
+    const maxRegion = Math.max(...displayRegions.map(r => r.count), 1)
+    const maxContinent = Math.max(...displayContinents.map(c => c.count), 1)
+    const maxBrowser = Math.max(...displayBrowsers.map(b => b.count), 1)
+    const maxOS = Math.max(...displayOS.map(o => o.count), 1)
+
+    // Handlers
+    const handleSelectRange = (range: typeof DATE_RANGES[0]) => {
+        setSelectedRangeValue(range.value)
+        setDateRangeOpen(false)
     }
+
+    const toggleFilter = (type: ActiveFilter['type'], value: string, label: string, icon?: React.ReactNode) => {
+        setActiveFilters(prev => {
+            const exists = prev.find(f => f.type === type && f.value === value)
+            if (exists) return prev.filter(f => !(f.type === type && f.value === value))
+            return [...prev, { type, value, label, icon }]
+        })
+    }
+
+    const toggleEventType = (type: 'clicks' | 'leads' | 'sales') => {
+        setActiveEventTypes(prev => {
+            if (prev.size === 3) return new Set([type])
+            if (prev.size === 1 && prev.has(type)) return new Set(['clicks', 'leads', 'sales'])
+            return new Set([type])
+        })
+    }
+
+    const removeFilter = (type: ActiveFilter['type'], value: string) => {
+        setActiveFilters(prev => prev.filter(f => !(f.type === type && f.value === value)))
+    }
+
+    const clearAllFilters = useCallback(() => {
+        setActiveFilters([])
+        setActiveEventTypes(new Set(['clicks', 'leads', 'sales']))
+    }, [])
+
+    // ESC to clear filters
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && (activeFilters.length > 0 || activeEventTypes.size < 3)) clearAllFilters()
+        }
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [activeFilters.length, activeEventTypes.size, clearAllFilters])
+
+    // KPI values passed to funnel chart
 
     return (
         <motion.div
@@ -134,18 +615,222 @@ export default function AnalyticsPage() {
             animate="visible"
             variants={staggerContainer}
         >
-            {/* Header */}
-            <motion.div variants={fadeInUp} transition={springGentle}>
-                <h1 className="text-[22px] font-semibold text-gray-900 tracking-tight">{t('analytics.title')}</h1>
-                <p className="text-[13px] text-gray-400 mt-0.5">{t('analytics.subtitle')}</p>
+            {/* ===== HEADER ===== */}
+            <motion.div variants={fadeInUp} transition={springGentle} className="flex items-end justify-between">
+                <div>
+                    <h1 className="text-[22px] font-semibold text-gray-900 tracking-tight">{t('analytics.title')}</h1>
+                    <p className="text-[13px] text-gray-400 mt-0.5">{t('analytics.subtitle')}</p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    {/* Date Range */}
+                    <Dropdown
+                        isOpen={dateRangeOpen}
+                        onClose={() => setDateRangeOpen(false)}
+                        trigger={
+                            <button
+                                onClick={() => setDateRangeOpen(!dateRangeOpen)}
+                                className="btn-press flex items-center gap-2 px-3.5 py-2 bg-white/80 backdrop-blur-sm border border-gray-200/60 rounded-xl text-[13px] font-medium text-gray-600 hover:border-gray-300 hover:bg-white transition-all shadow-sm shadow-black/[0.02]"
+                            >
+                                <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                                {selectedRange.label}
+                                <ChevronDown className="w-3.5 h-3.5 text-gray-300" />
+                            </button>
+                        }
+                    >
+                        {DATE_RANGES.map((range) => (
+                            <button
+                                key={range.value}
+                                onClick={() => handleSelectRange(range)}
+                                className={`btn-press w-full flex items-center justify-between px-4 py-2 text-[13px] transition-colors rounded-lg mx-1 ${
+                                    selectedRange.value === range.value
+                                        ? 'text-gray-900 font-medium bg-gray-50'
+                                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                                }`}
+                                style={{ width: 'calc(100% - 8px)' }}
+                            >
+                                {range.label}
+                                {selectedRange.value === range.value && <Check className="w-3.5 h-3.5 text-purple-500" />}
+                            </button>
+                        ))}
+                    </Dropdown>
+
+                    {/* Refresh */}
+                    <button
+                        onClick={() => mutate()}
+                        disabled={isValidating}
+                        className={`btn-press p-2 bg-white/80 backdrop-blur-sm border border-gray-200/60 rounded-xl text-gray-400 hover:text-gray-600 hover:border-gray-300 hover:bg-white transition-all shadow-sm shadow-black/[0.02] ${isValidating ? 'animate-spin' : ''}`}
+                    >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
+                </div>
             </motion.div>
 
-            {/* Total Clicks */}
+            {/* ===== ACTIVE FILTERS ===== */}
+            {(activeFilters.length > 0 || activeEventTypes.size < 3) && (
+                <div className="flex items-center gap-2 flex-wrap animate-in fade-in slide-in-from-top-1 duration-200">
+                    {activeEventTypes.size < 3 && (
+                        <div className="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1 bg-purple-50 border border-purple-200/50 rounded-full text-[13px]">
+                            <span className="text-purple-600 font-medium">
+                                Showing: {Array.from(activeEventTypes).join(', ')}
+                            </span>
+                            <button
+                                onClick={() => setActiveEventTypes(new Set(['clicks', 'leads', 'sales']))}
+                                className="p-1 rounded-full text-purple-400 hover:text-purple-600 hover:bg-purple-100 transition-colors"
+                            >
+                                <X className="w-3 h-3" />
+                            </button>
+                        </div>
+                    )}
+                    {activeFilters.map((filter) => (
+                        <FilterBadge
+                            key={`${filter.type}-${filter.value}`}
+                            filter={filter}
+                            onRemove={() => removeFilter(filter.type, filter.value)}
+                        />
+                    ))}
+                    <button
+                        onClick={clearAllFilters}
+                        className="flex items-center gap-1 px-2.5 py-1 text-[12px] font-medium text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                        Clear filters
+                        <kbd className="ml-0.5 px-1.5 py-0.5 bg-gray-100 rounded text-[10px] font-mono text-gray-400">esc</kbd>
+                    </button>
+                </div>
+            )}
+
+            {/* ===== FUNNEL + TIMELINE CHART ===== */}
             <motion.div variants={fadeInUp} transition={springGentle}>
-                <AnalyticsChart clicks={totalClicks} />
+                <AnalyticsChart
+                    clicks={kpi.clicks}
+                    leads={kpi.leads}
+                    sales={kpi.sales}
+                    revenue={kpi.revenue}
+                    timeseries={displayTimeseries}
+                    activeEventTypes={activeEventTypes}
+                    onEventTypeToggle={toggleEventType}
+                    selectedDays={selectedRange.days}
+                    onRangeChange={(days) => {
+                        const range = DATE_RANGES.find(r => r.days === days)
+                        if (range) setSelectedRangeValue(range.value)
+                    }}
+                    loadingTimeseries={isValidating}
+                />
             </motion.div>
 
-            {/* Channel & Campaign Breakdowns */}
+            {/* ===== BREAKDOWNS GRID ===== */}
+            <motion.div variants={fadeInUp} transition={springGentle} className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {/* Locations */}
+                <AnalyticsCard
+                    title="Locations"
+                    tabs={[
+                        { key: 'countries', label: 'Countries' },
+                        { key: 'cities', label: 'Cities' },
+                        { key: 'regions', label: 'Regions' },
+                        { key: 'continents', label: 'Continents' }
+                    ]}
+                    activeTab={locationTab}
+                    onTabChange={setLocationTab}
+                    settingsLabel="CLICKS"
+                >
+                    {locationTab === 'countries' && displayLocations.map((loc) => (
+                        <SimpleListItem
+                            key={loc.code}
+                            icon={<span className="text-base leading-none">{loc.flag}</span>}
+                            label={loc.name}
+                            count={loc.count}
+                            percentage={(loc.count / maxLocation) * 100}
+                            isSelected={activeFilters.some(f => f.type === 'country' && f.value === loc.code)}
+                            onClick={() => toggleFilter('country', loc.code, loc.name, <span className="text-sm">{loc.flag}</span>)}
+                        />
+                    ))}
+                    {locationTab === 'cities' && displayCities.map((city) => (
+                        <SimpleListItem
+                            key={city.name}
+                            icon={<span className="text-base leading-none">{city.flag}</span>}
+                            label={city.name}
+                            count={city.count}
+                            percentage={(city.count / maxCity) * 100}
+                            isSelected={activeFilters.some(f => f.type === 'city' && f.value === city.name)}
+                            onClick={() => toggleFilter('city', city.name, city.name, <span className="text-sm">{city.flag}</span>)}
+                        />
+                    ))}
+                    {locationTab === 'regions' && displayRegions.map((region) => (
+                        <SimpleListItem
+                            key={region.name}
+                            icon={<span className="text-base leading-none">{region.flag}</span>}
+                            label={region.name}
+                            count={region.count}
+                            percentage={(region.count / maxRegion) * 100}
+                            isSelected={activeFilters.some(f => f.type === 'region' && f.value === region.name)}
+                            onClick={() => toggleFilter('region', region.name, region.name, <span className="text-sm">{region.flag}</span>)}
+                        />
+                    ))}
+                    {locationTab === 'continents' && displayContinents.map((cont) => (
+                        <SimpleListItem
+                            key={cont.name}
+                            icon={<span className="text-base leading-none">{cont.flag}</span>}
+                            label={cont.name}
+                            count={cont.count}
+                            percentage={(cont.count / maxContinent) * 100}
+                            isSelected={activeFilters.some(f => f.type === 'continent' && f.value === cont.name)}
+                            onClick={() => toggleFilter('continent', cont.name, cont.name, <span className="text-sm">{cont.flag}</span>)}
+                        />
+                    ))}
+                </AnalyticsCard>
+
+                {/* Devices */}
+                <AnalyticsCard
+                    title="Devices"
+                    tabs={[
+                        { key: 'devices', label: 'Devices' },
+                        { key: 'browsers', label: 'Browsers' },
+                        { key: 'os', label: 'OS' }
+                    ]}
+                    activeTab={deviceTab}
+                    onTabChange={setDeviceTab}
+                    settingsLabel="CLICKS"
+                >
+                    {deviceTab === 'devices' && displayDevices.map((device) => {
+                        const Icon = device.icon
+                        return (
+                            <SimpleListItem
+                                key={device.name}
+                                icon={<Icon className="w-4 h-4 text-gray-400" />}
+                                label={device.name}
+                                count={device.count}
+                                percentage={(device.count / maxDevice) * 100}
+                                isSelected={activeFilters.some(f => f.type === 'device' && f.value === device.name)}
+                                onClick={() => toggleFilter('device', device.name, device.name, <Icon className="w-3.5 h-3.5 text-gray-400" />)}
+                            />
+                        )
+                    })}
+                    {deviceTab === 'browsers' && displayBrowsers.map((browser) => (
+                        <SimpleListItem
+                            key={browser.name}
+                            icon={<Globe className="w-4 h-4 text-gray-400" />}
+                            label={browser.name}
+                            count={browser.count}
+                            percentage={(browser.count / maxBrowser) * 100}
+                            isSelected={activeFilters.some(f => f.type === 'browser' && f.value === browser.name)}
+                            onClick={() => toggleFilter('browser', browser.name, browser.name, <Globe className="w-3.5 h-3.5 text-gray-400" />)}
+                        />
+                    ))}
+                    {deviceTab === 'os' && displayOS.map((os) => (
+                        <SimpleListItem
+                            key={os.name}
+                            icon={<Monitor className="w-4 h-4 text-gray-400" />}
+                            label={os.name}
+                            count={os.count}
+                            percentage={(os.count / maxOS) * 100}
+                            isSelected={activeFilters.some(f => f.type === 'os' && f.value === os.name)}
+                            onClick={() => toggleFilter('os', os.name, os.name, <Monitor className="w-3.5 h-3.5 text-gray-400" />)}
+                        />
+                    ))}
+                </AnalyticsCard>
+            </motion.div>
+
+            {/* ===== CHANNEL & CAMPAIGN ===== */}
             <motion.div variants={fadeInUp} transition={springGentle} className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 {/* Channels */}
                 <div className="bg-white/70 backdrop-blur-sm border border-gray-200/60 rounded-2xl p-6 shadow-sm shadow-black/[0.02]">
@@ -169,7 +854,7 @@ export default function AnalyticsPage() {
                                     icon={<Globe className={`w-3.5 h-3.5 ${config.textColor}`} />}
                                     color={config.color}
                                     count={clicks}
-                                    total={totalClicks}
+                                    total={totalDbClicks}
                                 />
                             ))}
                         </div>
@@ -177,28 +862,33 @@ export default function AnalyticsPage() {
                 </div>
 
                 {/* Campaigns */}
-                <div className="bg-white/70 backdrop-blur-sm border border-gray-200/60 rounded-2xl overflow-hidden shadow-sm shadow-black/[0.02]">
-                    <div className="px-6 pt-6 pb-4 flex items-center justify-between">
+                <div className="bg-white/70 backdrop-blur-sm border border-gray-200/60 rounded-2xl p-6 shadow-sm shadow-black/[0.02]">
+                    <div className="flex items-center justify-between mb-5">
                         <h2 className="text-sm font-semibold text-gray-900">{t('analytics.byCampaign')}</h2>
                         <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-widest">CLICKS</span>
                     </div>
                     {campaignBreakdown.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-10 px-6">
+                        <div className="flex flex-col items-center justify-center py-10">
                             <div className="w-10 h-10 rounded-2xl bg-gray-50 flex items-center justify-center mb-3">
                                 <TrendingUp className="w-4 h-4 text-gray-300" />
                             </div>
                             <p className="text-[13px] text-gray-400">{t('analytics.noData')}</p>
                         </div>
                     ) : (
-                        <div className="divide-y divide-gray-50/80">
-                            {campaignBreakdown.map(({ name, clicks }) => (
-                                <CampaignItem
-                                    key={name}
-                                    name={name}
-                                    clicks={clicks}
-                                    maxClicks={maxCampaign}
-                                />
-                            ))}
+                        <div>
+                            {campaignBreakdown.map(({ name, clicks, id }) => {
+                                const maxCampaign = Math.max(...campaignBreakdown.map(c => c.clicks), 1)
+                                return (
+                                    <SimpleListItem
+                                        key={name}
+                                        label={name}
+                                        count={clicks}
+                                        percentage={(clicks / maxCampaign) * 100}
+                                        isSelected={!!id && activeFilters.some(f => f.type === 'campaign' && f.value === id)}
+                                        onClick={() => id ? toggleFilter('campaign', id, name) : undefined}
+                                    />
+                                )
+                            })}
                         </div>
                     )}
                 </div>
