@@ -11,7 +11,7 @@ export default async function DashboardLayout({
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
-        redirect('/login')
+        redirect('https://traaaction.com/login')
     }
 
     let { data: profile } = await supabase

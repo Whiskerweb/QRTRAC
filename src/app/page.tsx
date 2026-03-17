@@ -116,16 +116,16 @@ export default async function HomePage() {
               </>
             ) : (
               <>
-                <Link href="/login">
+                <a href="https://traaaction.com/login">
                   <Button variant="ghost" size="sm" className="text-[12px] text-[#666] hover:text-[#111] h-8 rounded-lg font-medium">
                     Se connecter
                   </Button>
-                </Link>
-                <Link href="/signup">
+                </a>
+                <a href="https://traaaction.com/login">
                   <Button size="sm" className="bg-[#111] text-white hover:bg-[#222] h-8 px-4 rounded-lg text-[12px] font-medium shadow-none">
                     Commencer gratuitement
                   </Button>
-                </Link>
+                </a>
               </>
             )}
           </nav>
