@@ -81,7 +81,11 @@ export function LoginForm() {
         } else {
             const { error: err } = await supabase.auth.signInWithPassword({ email, password });
             if (err) {
-                setError(err.message);
+                if (err.message.toLowerCase().includes('rate limit') || err.message.toLowerCase().includes('too many requests')) {
+                    setError('Trop de tentatives. Veuillez patienter quelques minutes avant de réessayer.');
+                } else {
+                    setError(err.message);
+                }
             } else {
                 router.push('/dashboard');
                 router.refresh();
